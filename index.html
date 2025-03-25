@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EBOY-Inspired Isometric Pier Scene (Final)</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="scene-container"></div>
+    <div id="instructions">
+        <strong>Controls:</strong><br>
+        WASD or Arrow Keys: Move character<br>
+        Space: Jump<br>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module">
+        import { EBOYIsometricPierScene } from './js/main.js';
+
+        // Initialize the application when the DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            const app = new EBOYIsometricPierScene();
+        });
+    </script>
+</body>
+</html>
