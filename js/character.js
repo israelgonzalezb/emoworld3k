@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createStandardMaterial, createBoxGeometry } from './utils.js';
 import { Vinyl } from './vinyl.js';
+import { SpeechBubble } from './speechBubble.js';
 
 export class Character {
     constructor(scene) {
@@ -12,6 +13,9 @@ export class Character {
         this.vinyls = [];
         this.lastShootTime = 0;
         this.shootCooldown = 0.5; // Half second cooldown between shots
+        
+        // Add speech bubble properties
+        this.activeSpeechBubble = null;
     }
 
     createCharacter() {
@@ -212,7 +216,7 @@ export class Character {
             child.isGroup && child.position.x > 0);
     }
 
-    update(deltaTime, keys) {
+    update(deltaTime, keys, camera) {
         // Movement speed
         const moveSpeed = 5;
         let moving = false;
@@ -376,6 +380,14 @@ export class Character {
 
         // Update active vinyls
         this.vinyls = this.vinyls.filter(vinyl => vinyl.update(deltaTime));
+
+        // Update active speech bubble
+        if (this.activeSpeechBubble) {
+            const bubbleAlive = this.activeSpeechBubble.update(this.characterGroup.position, camera);
+            if (!bubbleAlive) {
+                this.activeSpeechBubble = null;
+            }
+        }
     }
 
     shootVinyl() {
@@ -406,5 +418,15 @@ export class Character {
 
     getPosition() {
         return this.characterGroup.position;
+    }
+
+    say(message) {
+        // Remove existing speech bubble if there is one
+        if (this.activeSpeechBubble) {
+            this.activeSpeechBubble.remove();
+        }
+        
+        // Create new speech bubble
+        this.activeSpeechBubble = new SpeechBubble(this.scene, message);
     }
 } 

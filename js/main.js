@@ -10,9 +10,6 @@ export class EBOYIsometricPierScene {
     constructor() {
         console.log("Initializing EBOYIsometricPierScene...");
         
-        // Initialize chat system
-        this.chatSystem = new ChatSystem();
-        
         // Scene setup
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x000033); // Dark blue background (EBOY style)
@@ -79,12 +76,14 @@ export class EBOYIsometricPierScene {
         // Clock for frame-rate independent movement
         this.clock = new THREE.Clock();
         
+        // Initialize chat system with character reference
+        console.log("Initializing chat system...");
+        this.chatSystem = new ChatSystem(this.character);
+        this.chatSystem.addSystemMessage("Welcome to the Cyberpunk Pier! Press E to throw vinyl discs.");
+        
         // Start animation loop
         console.log("Starting animation loop...");
         this.animate();
-        
-        // Welcome message
-        this.chatSystem.addSystemMessage("Welcome to the Cyberpunk Pier! Press E to throw vinyl discs.");
         
         console.log("EBOY-Inspired Isometric Pier Scene initialized");
     }
@@ -237,14 +236,14 @@ export class EBOYIsometricPierScene {
         
         // Update character
         if (this.character) {
-            this.character.update(deltaTime, this.keys);
+            this.character.update(deltaTime, this.keys, this.camera);
         }
         
         // Update NPCs
         if (this.npcs) {
             this.npcs.forEach(npc => {
                 if (npc) {
-                    npc.update(deltaTime, this.keys);
+                    npc.update(deltaTime, this.keys, this.camera);
                 }
             });
         }
