@@ -70,7 +70,8 @@ export class NPC extends Character {
             moveSpeed: 2,
             idleTimer: 0,
             idleDuration: 3 + Math.random() * 4, // Random duration between 3-7 seconds
-            isMoving: false
+            isMoving: false,
+            rotation: 0 // Add rotation state
         };
         this.updateTargetPosition();
     }
@@ -104,12 +105,16 @@ export class NPC extends Character {
                 this.characterState.x += direction.x * this.idleState.moveSpeed * deltaTime;
                 this.characterState.z += direction.z * this.idleState.moveSpeed * deltaTime;
                 
-                // Update character position
+                // Update rotation to face movement direction
+                this.idleState.rotation = Math.atan2(direction.x, direction.z);
+                
+                // Update character position and rotation
                 this.characterGroup.position.set(
                     this.characterState.x,
                     this.characterState.y,
                     this.characterState.z
                 );
+                this.characterGroup.rotation.y = this.idleState.rotation;
             } else {
                 this.idleState.isMoving = false;
             }

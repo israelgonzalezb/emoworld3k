@@ -138,26 +138,44 @@ export class Character {
             velocity: new THREE.Vector3(),
             isJumping: false,
             jumpVelocity: 0,
-            baseY: 0.9 // Base y position for landing
+            baseY: 0.9, // Base y position for landing
+            rotation: 0 // Add rotation state
         };
     }
 
     update(deltaTime, keys) {
         // Movement speed
         const moveSpeed = 5;
+        let moving = false;
+        let moveDirection = new THREE.Vector3();
         
         // Update position based on input
         if (keys['ArrowLeft'] || keys['KeyA']) {
             this.characterState.x -= moveSpeed * deltaTime;
+            moveDirection.x -= 1;
+            moving = true;
         }
         if (keys['ArrowRight'] || keys['KeyD']) {
             this.characterState.x += moveSpeed * deltaTime;
+            moveDirection.x += 1;
+            moving = true;
         }
         if (keys['ArrowUp'] || keys['KeyW']) {
             this.characterState.z -= moveSpeed * deltaTime;
+            moveDirection.z -= 1;
+            moving = true;
         }
         if (keys['ArrowDown'] || keys['KeyS']) {
             this.characterState.z += moveSpeed * deltaTime;
+            moveDirection.z += 1;
+            moving = true;
+        }
+        
+        // Update rotation if moving
+        if (moving) {
+            moveDirection.normalize();
+            const targetRotation = Math.atan2(moveDirection.x, moveDirection.z);
+            this.characterState.rotation = targetRotation;
         }
         
         // Jumping
@@ -183,12 +201,13 @@ export class Character {
         this.characterState.x = Math.max(-19.5, Math.min(19.5, this.characterState.x));
         this.characterState.z = Math.max(-9.5, Math.min(9.5, this.characterState.z));
         
-        // Update character position
+        // Update character position and rotation
         this.characterGroup.position.set(
             this.characterState.x,
             this.characterState.y,
             this.characterState.z
         );
+        this.characterGroup.rotation.y = this.characterState.rotation;
     }
 
     getPosition() {
