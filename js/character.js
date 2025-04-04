@@ -23,124 +23,124 @@ export class Character {
         this.characterGroup = new THREE.Group();
         
         // Body - slim hoodie with better proportions
-        const bodyGeometry = createBoxGeometry(0.85, 1.3, 0.45);
+        const bodyGeometry = createBoxGeometry(0.6, 1.4, 0.4); // Slimmer and taller body
         const bodyMaterial = createStandardMaterial(0x000000, 0.9); // Pure black for hoodie
         const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        body.position.set(0, 0.5, 0);
+        body.position.set(0, 0.7, 0); // Adjusted height
         body.name = 'hoodie';
         this.characterGroup.add(body);
         
         // Hood - more defined shape
-        const hoodGeometry = createBoxGeometry(0.6, 0.4, 0.45);
+        const hoodGeometry = createBoxGeometry(0.5, 0.35, 0.4); // Adjusted hood size
         const hoodMaterial = createStandardMaterial(0x000000, 0.9);
         const hood = new THREE.Mesh(hoodGeometry, hoodMaterial);
-        hood.position.set(0, 1.25, -0.05);
+        hood.position.set(0, 1.4, -0.05);
         hood.name = 'hood';
         this.characterGroup.add(hood);
 
         // Hoodie pocket
-        const pocketGeometry = createBoxGeometry(0.5, 0.25, 0.05);
+        const pocketGeometry = createBoxGeometry(0.4, 0.2, 0.05); // Adjusted pocket size
         const pocket = new THREE.Mesh(pocketGeometry, bodyMaterial);
-        pocket.position.set(0, 0.35, 0.25);
+        pocket.position.set(0, 0.4, 0.2);
         pocket.name = 'pocket';
         this.characterGroup.add(pocket);
 
         // Hoodie drawstrings
-        const drawstringGeometry = createBoxGeometry(0.05, 0.25, 0.05);
+        const drawstringGeometry = createBoxGeometry(0.04, 0.2, 0.04); // Thinner drawstrings
         const drawstringMaterial = createStandardMaterial(0xFFFFFF, 0.9);
         
         const leftDrawstring = new THREE.Mesh(drawstringGeometry, drawstringMaterial);
-        leftDrawstring.position.set(-0.2, 1.0, 0.2);
+        leftDrawstring.position.set(-0.15, 1.2, 0.15);
         leftDrawstring.rotation.z = 0.3;
         this.characterGroup.add(leftDrawstring);
         
         const rightDrawstring = new THREE.Mesh(drawstringGeometry, drawstringMaterial);
-        rightDrawstring.position.set(0.2, 1.0, 0.2);
+        rightDrawstring.position.set(0.15, 1.2, 0.15);
         rightDrawstring.rotation.z = -0.3;
         this.characterGroup.add(rightDrawstring);
         
         // Head - adjusted proportions
-        const headGeometry = createBoxGeometry(0.45, 0.5, 0.4);
+        const headGeometry = createBoxGeometry(0.35, 0.4, 0.35); // Smaller, more realistic head
         const headMaterial = createStandardMaterial(0xffdbac, 0.9);
         const head = new THREE.Mesh(headGeometry, headMaterial);
-        head.position.set(0, 1.45, 0);
+        head.position.set(0, 1.6, 0);
         head.name = 'head';
         this.characterGroup.add(head);
         
         // Hair - styled like the reference
-        const hairGeometry = createBoxGeometry(0.5, 0.3, 0.45);
+        const hairGeometry = createBoxGeometry(0.4, 0.25, 0.4); // Adjusted hair size
         const hairMaterial = createStandardMaterial(0x3a1f13, 0.9); // Darker brown
         const hair = new THREE.Mesh(hairGeometry, hairMaterial);
-        hair.position.set(0, 1.7, 0);
+        hair.position.set(0, 1.8, 0);
         hair.name = 'hair';
         this.characterGroup.add(hair);
 
         // Hair sides and back
-        const hairSideGeometry = createBoxGeometry(0.12, 0.4, 0.4);
+        const hairSideGeometry = createBoxGeometry(0.1, 0.35, 0.35); // Thinner hair sides
         const leftHairSide = new THREE.Mesh(hairSideGeometry, hairMaterial);
-        leftHairSide.position.set(-0.28, 1.5, 0);
+        leftHairSide.position.set(-0.2, 1.7, 0);
         this.characterGroup.add(leftHairSide);
 
         const rightHairSide = new THREE.Mesh(hairSideGeometry, hairMaterial);
-        rightHairSide.position.set(0.28, 1.5, 0);
+        rightHairSide.position.set(0.2, 1.7, 0);
         this.characterGroup.add(rightHairSide);
 
         // Hair back piece
-        const hairBackGeometry = createBoxGeometry(0.5, 0.4, 0.15);
+        const hairBackGeometry = createBoxGeometry(0.4, 0.35, 0.12); // Adjusted back hair
         const hairBack = new THREE.Mesh(hairBackGeometry, hairMaterial);
-        hairBack.position.set(0, 1.5, -0.2);
+        hairBack.position.set(0, 1.7, -0.15);
         this.characterGroup.add(hairBack);
         
         // Face - more detailed
-        const faceGeometry = createBoxGeometry(0.4, 0.4, 0.05);
+        const faceGeometry = createBoxGeometry(0.3, 0.3, 0.05); // Smaller face
         const faceMaterial = createStandardMaterial(0xffdbac, 0.9);
         const face = new THREE.Mesh(faceGeometry, faceMaterial);
-        face.position.set(0, 1.45, 0.225);
+        face.position.set(0, 1.6, 0.2);
         face.name = 'face';
         this.characterGroup.add(face);
         
         // Eyes - smaller and more expressive
-        const eyeGeometry = createBoxGeometry(0.08, 0.15, 0.05);
+        const eyeGeometry = createBoxGeometry(0.06, 0.12, 0.05); // Smaller eyes
         const eyeMaterial = createStandardMaterial(0x000000, 0.9);
         
         const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        leftEye.position.set(-0.12, 1.48, 0.26);
+        leftEye.position.set(-0.1, 1.63, 0.25);
         leftEye.name = 'leftEye';
         this.characterGroup.add(leftEye);
         
         const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        rightEye.position.set(0.12, 1.48, 0.26);
+        rightEye.position.set(0.1, 1.63, 0.25);
         rightEye.name = 'rightEye';
         this.characterGroup.add(rightEye);
         
         // Arms - adjusted proportions
-        const armGeometry = createBoxGeometry(0.25, 0.8, 0.25);
+        const armGeometry = createBoxGeometry(0.2, 0.7, 0.2); // Thinner arms
         const armMaterial = createStandardMaterial(0x000000, 0.9);
         
         const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-        leftArm.position.set(-0.55, 0.35, 0);
+        leftArm.position.set(-0.4, 0.7, 0);
         leftArm.rotation.z = 0.15;
         leftArm.name = 'leftArm';
         this.characterGroup.add(leftArm);
         
         const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-        rightArm.position.set(0.55, 0.35, 0);
+        rightArm.position.set(0.4, 0.7, 0);
         rightArm.rotation.z = -0.15;
         rightArm.name = 'rightArm';
         this.characterGroup.add(rightArm);
         
         // Legs - skinny jeans style
-        const legGeometry = createBoxGeometry(0.3, 0.9, 0.3);
+        const legGeometry = createBoxGeometry(0.25, 0.8, 0.25); // Thinner legs
         const legMaterial = createStandardMaterial(0x000000, 0.9);
         
         const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-        leftLeg.position.set(-0.2, -0.15, 0);
+        leftLeg.position.set(-0.15, -0.1, 0);
         leftLeg.rotation.x = 0.1;
         leftLeg.name = 'leftLeg';
         this.characterGroup.add(leftLeg);
         
         const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-        rightLeg.position.set(0.2, -0.15, 0);
+        rightLeg.position.set(0.15, -0.1, 0);
         rightLeg.rotation.x = -0.1;
         rightLeg.name = 'rightLeg';
         this.characterGroup.add(rightLeg);
@@ -150,30 +150,30 @@ export class Character {
             const sneakerGroup = new THREE.Group();
             
             // Main shoe body
-            const upperGeometry = createBoxGeometry(0.32, 0.18, 0.5);
+            const upperGeometry = createBoxGeometry(0.25, 0.15, 0.4); // Smaller sneakers
             const upperMaterial = createStandardMaterial(0x000000, 0.9);
             const upper = new THREE.Mesh(upperGeometry, upperMaterial);
-            upper.position.set(0, 0.06, 0);
+            upper.position.set(0, 0.05, 0);
             sneakerGroup.add(upper);
             
             // Sole
-            const soleGeometry = createBoxGeometry(0.35, 0.12, 0.52);
+            const soleGeometry = createBoxGeometry(0.28, 0.1, 0.42); // Adjusted sole
             const soleMaterial = createStandardMaterial(0xFFFFFF, 0.9);
             const sole = new THREE.Mesh(soleGeometry, soleMaterial);
             sole.position.set(0, -0.05, 0);
             sneakerGroup.add(sole);
             
             // Laces
-            const laceGeometry = createBoxGeometry(0.28, 0.02, 0.02);
+            const laceGeometry = createBoxGeometry(0.22, 0.02, 0.02); // Thinner laces
             const laceMaterial = createStandardMaterial(0xFFFFFF, 0.9);
             for (let i = 0; i < 3; i++) {
                 const lace = new THREE.Mesh(laceGeometry, laceMaterial);
-                lace.position.set(0, 0.1, 0.15 - i * 0.12);
+                lace.position.set(0, 0.08, 0.12 - i * 0.1);
                 sneakerGroup.add(lace);
             }
             
             // Position the complete shoe
-            sneakerGroup.position.set(isLeft ? -0.2 : 0.2, -0.7, 0);
+            sneakerGroup.position.set(isLeft ? -0.15 : 0.15, -0.5, 0);
             sneakerGroup.rotation.x = isLeft ? 0.1 : -0.1;
             return sneakerGroup;
         };
@@ -223,29 +223,29 @@ export class Character {
         let moveDirection = new THREE.Vector3();
         
         // Update position based on input
-        if (keys['ArrowLeft'] || keys['KeyA']) {
+        if (keys['ArrowLeft']) {
             this.characterState.x -= moveSpeed * deltaTime;
             moveDirection.x -= 1;
             moving = true;
         }
-        if (keys['ArrowRight'] || keys['KeyD']) {
+        if (keys['ArrowRight']) {
             this.characterState.x += moveSpeed * deltaTime;
             moveDirection.x += 1;
             moving = true;
         }
-        if (keys['ArrowUp'] || keys['KeyW']) {
+        if (keys['ArrowUp']) {
             this.characterState.z -= moveSpeed * deltaTime;
             moveDirection.z -= 1;
             moving = true;
         }
-        if (keys['ArrowDown'] || keys['KeyS']) {
+        if (keys['ArrowDown']) {
             this.characterState.z += moveSpeed * deltaTime;
             moveDirection.z += 1;
             moving = true;
         }
 
         // Handle vinyl shooting with arm animation
-        if (keys['KeyE']) {
+        if (keys['Enter']) {
             const currentTime = Date.now() / 1000;
             if (currentTime - this.lastShootTime >= this.shootCooldown) {
                 this.shootVinyl();
@@ -348,7 +348,9 @@ export class Character {
         }
         
         // Jumping
-        if ((keys['Space'] || keys['Spacebar']) && !this.characterState.isJumping) {
+        const chatInput = document.getElementById('chat-input');
+        if ((keys['ShiftLeft'] || keys['ShiftRight']) && !this.characterState.isJumping && 
+            (!chatInput || !chatInput.matches(':focus'))) {
             this.characterState.isJumping = true;
             this.characterState.jumpVelocity = 8;
         }
@@ -392,7 +394,7 @@ export class Character {
 
     shootVinyl() {
         // Calculate spawn position from the right hand
-        const rightArmPosition = new THREE.Vector3(0.55, 0.35, 0);
+        const rightArmPosition = new THREE.Vector3(0.4, 0.7, 0);
         rightArmPosition.applyMatrix4(this.characterGroup.matrix);
         
         const spawnOffset = new THREE.Vector3(0.3, 1.2, 0.5);
