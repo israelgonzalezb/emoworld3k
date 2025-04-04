@@ -1,11 +1,17 @@
 import * as THREE from 'three';
 import { createStandardMaterial, createBoxGeometry } from './utils.js';
+import { Vinyl } from './vinyl.js';
 
 export class Character {
     constructor(scene) {
         this.scene = scene;
         this.createCharacter();
         this.setupState();
+        
+        // Add vinyl shooting properties
+        this.vinyls = [];
+        this.lastShootTime = 0;
+        this.shootCooldown = 0.5; // Half second cooldown between shots
     }
 
     createCharacter() {
@@ -186,15 +192,20 @@ export class Character {
             jumpVelocity: 0,
             baseY: 0.9,
             rotation: 0,
-            // Add animation state
             walkTime: 0,
-            walkSpeed: 8, // Controls how fast the legs move
-            walkAmplitude: 0.4 // Controls how far the legs swing
+            walkSpeed: 8,
+            walkAmplitude: 0.4,
+            // Add arm animation states
+            throwingArm: false,
+            throwTime: 0,
+            throwDuration: 0.3 // Duration of throw animation in seconds
         };
 
-        // Store references to legs for animation
+        // Store references to legs and arms for animation
         this.leftLeg = this.characterGroup.getObjectByName('leftLeg');
         this.rightLeg = this.characterGroup.getObjectByName('rightLeg');
+        this.leftArm = this.characterGroup.getObjectByName('leftArm');
+        this.rightArm = this.characterGroup.getObjectByName('rightArm');
         this.leftShoe = this.characterGroup.children.find(child => 
             child.isGroup && child.position.x < 0);
         this.rightShoe = this.characterGroup.children.find(child => 
@@ -228,6 +239,17 @@ export class Character {
             moveDirection.z += 1;
             moving = true;
         }
+
+        // Handle vinyl shooting with arm animation
+        if (keys['KeyE']) {
+            const currentTime = Date.now() / 1000;
+            if (currentTime - this.lastShootTime >= this.shootCooldown) {
+                this.shootVinyl();
+                this.lastShootTime = currentTime;
+                this.characterState.throwingArm = true;
+                this.characterState.throwTime = 0;
+            }
+        }
         
         // Update rotation if moving
         if (moving) {
@@ -251,6 +273,44 @@ export class Character {
                     -0.1, 
                     deltaTime * 5
                 );
+            }
+        }
+        
+        // Update arm animations
+        if (this.leftArm && this.rightArm) {
+            if (this.characterState.throwingArm) {
+                // Throwing animation
+                this.characterState.throwTime += deltaTime;
+                const throwProgress = this.characterState.throwTime / this.characterState.throwDuration;
+                
+                if (throwProgress <= 1) {
+                    // Wind up and throw motion
+                    const throwPhase = Math.min(throwProgress * Math.PI, Math.PI);
+                    this.rightArm.rotation.x = Math.sin(throwPhase) * 2 - 1; // Wind up and forward throw
+                    this.rightArm.rotation.z = -0.15 - Math.sin(throwPhase) * 0.3; // Slight outward motion
+                } else {
+                    // Reset throwing state
+                    this.characterState.throwingArm = false;
+                    this.rightArm.rotation.x = 0;
+                    this.rightArm.rotation.z = -0.15;
+                }
+            } else if (moving) {
+                // Walking arm animations
+                const leftArmAngle = -Math.sin(this.characterState.walkTime) * this.characterState.walkAmplitude * 0.7;
+                const rightArmAngle = -Math.sin(this.characterState.walkTime + Math.PI) * this.characterState.walkAmplitude * 0.7;
+                
+                this.leftArm.rotation.x = leftArmAngle;
+                this.rightArm.rotation.x = rightArmAngle;
+                
+                // Add slight side-to-side motion
+                this.leftArm.rotation.z = 0.15 + Math.sin(this.characterState.walkTime) * 0.1;
+                this.rightArm.rotation.z = -0.15 - Math.sin(this.characterState.walkTime) * 0.1;
+            } else {
+                // Return arms to idle position
+                this.leftArm.rotation.x = THREE.MathUtils.lerp(this.leftArm.rotation.x, 0, deltaTime * 5);
+                this.rightArm.rotation.x = THREE.MathUtils.lerp(this.rightArm.rotation.x, 0, deltaTime * 5);
+                this.leftArm.rotation.z = THREE.MathUtils.lerp(this.leftArm.rotation.z, 0.15, deltaTime * 5);
+                this.rightArm.rotation.z = THREE.MathUtils.lerp(this.rightArm.rotation.z, -0.15, deltaTime * 5);
             }
         }
         
@@ -313,6 +373,35 @@ export class Character {
             this.characterState.z
         );
         this.characterGroup.rotation.y = this.characterState.rotation;
+
+        // Update active vinyls
+        this.vinyls = this.vinyls.filter(vinyl => vinyl.update(deltaTime));
+    }
+
+    shootVinyl() {
+        // Calculate spawn position from the right hand
+        const rightArmPosition = new THREE.Vector3(0.55, 0.35, 0);
+        rightArmPosition.applyMatrix4(this.characterGroup.matrix);
+        
+        const spawnOffset = new THREE.Vector3(0.3, 1.2, 0.5);
+        spawnOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.characterState.rotation);
+        
+        const spawnPosition = new THREE.Vector3(
+            this.characterGroup.position.x + spawnOffset.x,
+            this.characterGroup.position.y + spawnOffset.y,
+            this.characterGroup.position.z + spawnOffset.z
+        );
+        
+        // Calculate shooting direction based on character's rotation
+        const direction = new THREE.Vector3(
+            Math.sin(this.characterState.rotation),
+            0,
+            Math.cos(this.characterState.rotation)
+        );
+        
+        // Create new vinyl
+        const vinyl = new Vinyl(this.scene, spawnPosition, direction);
+        this.vinyls.push(vinyl);
     }
 
     getPosition() {

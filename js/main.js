@@ -4,10 +4,14 @@ import { Pier } from './pier.js';
 import { DecorativeElements } from './decorative.js';
 import { NPC } from './npc.js';
 import { Billboard } from './billboard.js';
+import { ChatSystem } from './chat.js';
 
 export class EBOYIsometricPierScene {
     constructor() {
         console.log("Initializing EBOYIsometricPierScene...");
+        
+        // Initialize chat system
+        this.chatSystem = new ChatSystem();
         
         // Scene setup
         this.scene = new THREE.Scene();
@@ -78,6 +82,9 @@ export class EBOYIsometricPierScene {
         // Start animation loop
         console.log("Starting animation loop...");
         this.animate();
+        
+        // Welcome message
+        this.chatSystem.addSystemMessage("Welcome to the Cyberpunk Pier! Press E to throw vinyl discs.");
         
         console.log("EBOY-Inspired Isometric Pier Scene initialized");
     }
