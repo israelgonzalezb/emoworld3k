@@ -1,0 +1,79 @@
+Mechanics of Habbo Hotel
+
+Core Concept: Social Virtual World
+
+Habbo Hotel is fundamentally a social MMO (Massively Multiplayer Online) game presented in a distinctive pixel-art style.   
+The primary goal isn't necessarily winning, but rather socializing, creating, collecting, and participating in the virtual community.
+It simulates a hotel environment where players interact via customizable avatars called "Habbos."   
+2. Avatars (Habbos)   
+
+Creation: New users create a unique Habbo avatar.   
+Customization: This is a key feature. Players can change:
+Clothing: Shirts, trousers, skirts, dresses, shoes, jackets.
+Hair: Various styles and colors.
+Accessories: Hats, glasses, masks, handheld items.
+Appearance: Skin tone.
+Acquisition: While some basic options are free, a vast range of clothing and accessories are purchased using in-game currencies (primarily Credits). Some are temporary unlocks via subscriptions (Habbo Club).   
+3. Environments: Rooms
+
+Public Rooms:
+These are official, pre-designed spaces created and managed by Habbo staff (Sulake).
+Examples include the Welcome Lounge, theatre-style rooms, cafes, pools, and themed event spaces.   
+They serve as central hubs for meeting new people, participating in official events, or just hanging out.
+Navigation usually involves a "Navigator" tool showing popular and official rooms.   
+Guest Rooms (Player-Owned):
+This is a cornerstone of Habbo creativity. Any player can create their own rooms.
+Building & Decorating: Players use "Furni" (furniture items) to design and furnish their rooms. This includes walls, floors, chairs, tables, decorations, interactive items, and more.   
+Customization: Room layouts, wall/floor patterns, lighting, and access settings (open, locked, passworded, invisible) can be modified.
+Purpose: Rooms are used for various purposes: private hangouts, trading centers, role-playing scenarios, hosting user-created games, showcasing collections, group headquarters, etc.
+Capacity: Rooms have player limits, which can sometimes be increased.
+4. Social Interaction
+
+Chat:
+Public Chat: Players type messages that appear as speech bubbles above their avatar's head, visible to everyone in the same room. Filters ("Bobba") automatically censor potentially offensive language.   
+Private Messaging (Console/Messenger): Players can send direct messages to users on their friends list, regardless of whether they are in the same room.   
+Friends List: Players can send friend requests. Accepted friends appear on a list, making it easy to see who is online and join them in rooms.
+Respect/Scratching: A simple way to show appreciation for another player or their room (often represented by a thumbs-up or similar action).
+Groups: Players can create or join groups, which function like clubs or clans. Groups have unique badges (displayed by members), dedicated home rooms, and sometimes forums.   
+Relationships: Players can set relationship statuses with friends (e.g., dating, married - purely cosmetic/social).
+5. Economy
+
+Currencies: Habbo utilizes multiple currencies:
+Credits (C): The premium currency. Purchased with real money. Used to buy most Furni, clothing, Habbo Club/Builders Club memberships, Marketplace items, trading currency, and certain features.
+Duckets (D): An earned currency. Obtained through logging in daily, completing achievements, and participating in activities. Used for renting certain Furni, room promotional effects, basic avatar effects, and purchasing specific 'Duckets Shop' items. Often seen as a 'free-to-play' currency.
+Diamonds: Often awarded as a bonus when purchasing Credits. Used to buy exclusive 'rare' Furni or Credit exchange items.   
+Furni (Furniture):
+These are the collectible items used to decorate rooms. They range from common items to very rare and limited-edition pieces (LTDs).
+Furni is the backbone of the Habbo economy. Players buy, sell, and trade Furni constantly.
+Value is determined by rarity, demand, age, and sometimes perceived aesthetic appeal.
+Trading:
+Players can engage in direct, peer-to-peer trading using a secure trading window.   
+Items (Furni) and Credits can be exchanged.   
+This system is vital but also requires caution due to potential scams.
+Marketplace:
+An in-game auction house/exchange system. Players can list their Furni for sale at a set Credit price.
+Other players can browse listings and purchase items directly.
+This provides a more structured way to trade than direct P2P, often establishing baseline values for items.
+Subscriptions:
+Habbo Club (HC): A monthly subscription offering benefits like exclusive clothing, hairstyles, expanded friends list, special chat commands, free monthly HC Furni gifts, and access to exclusive HC room layouts.   
+Builders Club (BC): A subscription focused on room building. Grants temporary access to a vast warehouse of Furni for building purposes (items are removed if the subscription lapses), increased room limits, and special floor plan editing tools.
+6. Games & Activities
+
+Official Games: Habbo has developed several official multiplayer games hosted in specific public rooms. Examples over the years include:
+SnowStorm: A snowball fighting game.
+Battle Banzai: A competitive game where players claim tiles by jumping on them.
+Freeze: Players freeze opponents by throwing snowballs; frozen players can be freed by teammates.
+(Note: Availability of specific official games can change over time).
+User-Created Games: A huge part of the Habbo experience. Players use Furni with interactive elements (rollers, switches, gates, scoreboards, teleporters, wired logic) to create their own games within their guest rooms. Popular examples include:
+Falling Furni: Dodge items dropped from above.
+Mazes: Navigate complex pathways.
+Costume Change: Quickly change outfits to match a theme.
+Danger Pod / Telephrase: Answer questions correctly to avoid elimination.
+Role-Playing Games (RPGs): Themed rooms where players adopt specific roles (e.g., hospital, police station, school).
+Events & Quests: Habbo staff regularly run themed campaigns (e.g., Habboween, Christmas), competitions, and quests that reward players with badges, Furni, or currency for participation.   
+7. Moderation & Safety
+
+Auto-Moderation: The "Bobba" filter replaces inappropriate words or phrases.   
+Reporting Tools: Players can report users or rooms for breaking the "Habbo Way" (code of conduct).   
+Human Moderators: Staff members monitor the hotel, respond to reports, and issue sanctions (mutes, kicks, bans) for rule violations like scamming, bullying, or inappropriate behavior.
+In summary, Habbo Hotel's mechanics revolve around social interaction within customizable environments, driven by a robust virtual economy based on collectible items (Furni) and multiple currencies. Player creativity in room building and game hosting is a significant aspect, complemented by official activities and a strong emphasis on community participation.
