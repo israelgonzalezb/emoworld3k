@@ -1,0 +1,76 @@
+/* Specific fix for transparent bars at the top of the screen */
+
+/* Special fix for chat-messages elements at the top */
+#chat-messages:not([style*="bottom:"]),
+#chat-messages[style*="top:0"],
+#chat-messages[style*="top: 0"],
+div#chat-messages:first-child,
+div#chat-messages:nth-child(1),
+div#chat-messages:nth-child(2) {
+    display: none !important;
+}
+
+/* Make sure the properly positioned chat-messages is visible */
+div#chat-messages[style*="bottom:"] {
+    display: block !important;
+    position: fixed !important;
+    bottom: 80px !important;
+    top: auto !important;
+}
+
+/* Hide all unexpected fixed/absolute positioned elements at the top */
+body > *:not(#scene-container):not(#instructions):not(#chat-messages):not(#chat-container) {
+    display: none !important;
+}
+
+/* Exceptions for scripts and styles */
+body > script,
+body > style {
+    display: block !important;
+}
+
+/* Specially target the transparent bars that appear at the top */
+.transparent-bar,
+#top-bar,
+.status-bar,
+body > canvas,
+body > div[style*="top:0"],
+body > div[style*="top: 0"],
+body > div:nth-child(1):not(#scene-container),
+body > div:nth-child(2):not(#instructions):not(#chat-messages):not(#chat-container) {
+    display: none !important;
+}
+
+/* Hide ANY additional chat-messages elements */
+body > div#chat-messages:not(:last-of-type) {
+    display: none !important;
+}
+
+/* Hide ALL canvas elements except the three.js canvas in scene-container */
+body > canvas,
+canvas:not(#scene-container canvas) {
+    display: none !important;
+}
+
+/* Ensure the scene container is still visible */
+#scene-container {
+    display: block !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: 0 !important;
+}
+
+/* Make sure THREE.js canvas inside scene-container is visible */
+#scene-container canvas {
+    display: block !important;
+}
+
+/* Ensure chat and instructions are still visible */
+#instructions,
+#chat-container {
+    display: block !important;
+    z-index: 1000 !important;
+} 

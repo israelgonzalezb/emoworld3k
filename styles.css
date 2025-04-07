@@ -11,6 +11,17 @@ body {
     height: 100%;
 }
 
+/* Fix for the transparent bars at the top of the screen */
+.transparent-bar {
+    display: none;
+}
+
+/* Hide any unwanted UI elements */
+#scene-container::before,
+#scene-container::after {
+    display: none;
+}
+
 #instructions {
     position: absolute;
     top: 20px;

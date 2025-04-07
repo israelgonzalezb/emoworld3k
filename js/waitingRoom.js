@@ -95,11 +95,11 @@ export function createWaitingRoomScene(mainSceneName, mainAreaSpawnPoint) {
 
 
     // --- Return Portal ---
-    const returnPortalPosition = new THREE.Vector3(0, 1.5, floorSize / 2 - 2); // Near the front wall
+    const returnPortalPosition = new THREE.Vector3(5, 2.5, floorSize / 2 - 2); // Increased Y from 8.5 to 15.5
     const returnPortal = new Portal(
         scene,
         returnPortalPosition,
-        1.0, // Size of the portal
+        1.5, // Increased size from 1.0 to 1.5
         mainSceneName, // Target scene name (passed in)
         mainAreaSpawnPoint // Target spawn point (passed in)
     );

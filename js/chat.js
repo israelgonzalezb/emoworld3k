@@ -31,7 +31,7 @@ export class ChatSystem {
 
             #chat-messages {
                 position: fixed;
-                bottom: 80px;
+                bottom: 80px; /* Keep at bottom, not top */
                 left: 50%;
                 transform: translateX(-50%);
                 width: 80%;
@@ -45,6 +45,12 @@ export class ChatSystem {
                 margin-bottom: 10px;
                 font-family: 'Arial', sans-serif;
                 z-index: 1000;
+                top: auto !important; /* Force NOT at top */
+            }
+
+            /* Ensure no duplicate chat messages at top */
+            body > #chat-messages:not([style*="bottom:"]) {
+                display: none !important;
             }
 
             #chat-form {
@@ -107,6 +113,13 @@ export class ChatSystem {
                 background: rgba(0, 255, 157, 0.1);
                 border-left: 3px solid #00ff9d;
             }
+            
+            /* Remove transparent bars */
+            .transparent-bar,
+            #top-bar,
+            .status-bar {
+                display: none !important;
+            }
         `;
     }
 
@@ -116,16 +129,64 @@ export class ChatSystem {
         if (existingContainer) {
             existingContainer.remove();
         }
-
+        
         // Create new chat container
         const chatContainer = document.createElement('div');
         chatContainer.id = 'chat-container';
         document.body.appendChild(chatContainer);
 
-        // Create messages container
-        const messagesContainer = document.createElement('div');
-        messagesContainer.id = 'chat-messages';
-        chatContainer.appendChild(messagesContainer);
+        // Get the existing messages container from index.html instead of creating a new one
+        let messagesContainer = document.getElementById('chat-messages');
+        const existingMessages = [];
+        
+        // If we have an existing messages container, save its contents
+        if (messagesContainer) {
+            // Store existing messages before removing
+            Array.from(messagesContainer.children).forEach(child => {
+                existingMessages.push({
+                    className: child.className,
+                    text: child.textContent
+                });
+            });
+            
+            // Only remove if it's at the top of the screen
+            if (!messagesContainer.style.bottom || messagesContainer.style.bottom === '' || 
+                window.getComputedStyle(messagesContainer).top === '0px') {
+                messagesContainer.remove();
+                messagesContainer = null;
+            }
+        }
+        
+        // Create a new messages container if needed
+        if (!messagesContainer) {
+            messagesContainer = document.createElement('div');
+            messagesContainer.id = 'chat-messages';
+            document.body.appendChild(messagesContainer);
+        }
+        
+        // Ensure it has the correct positioning
+        messagesContainer.style.position = 'fixed';
+        messagesContainer.style.bottom = '80px';
+        messagesContainer.style.top = 'auto';
+        messagesContainer.style.left = '50%';
+        messagesContainer.style.transform = 'translateX(-50%)';
+        messagesContainer.style.width = '80%';
+        messagesContainer.style.maxWidth = '800px';
+        messagesContainer.style.maxHeight = '200px';
+        messagesContainer.style.zIndex = '1000';
+        messagesContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        messagesContainer.style.border = '1px solid #00ff9d';
+        messagesContainer.style.borderRadius = '25px';
+        messagesContainer.style.padding = '10px';
+        messagesContainer.style.overflowY = 'auto';
+        
+        // Restore any existing messages
+        existingMessages.forEach(msg => {
+            const messageElement = document.createElement('div');
+            messageElement.className = msg.className;
+            messageElement.textContent = msg.text;
+            messagesContainer.appendChild(messageElement);
+        });
 
         // Create form
         const form = document.createElement('form');
@@ -145,6 +206,14 @@ export class ChatSystem {
         sendButton.id = 'chat-send';
         sendButton.textContent = 'Send';
         form.appendChild(sendButton);
+        
+        // Remove any transparent bars that might exist
+        document.querySelectorAll('.transparent-bar, #top-bar, .status-bar').forEach(el => {
+            // Don't remove chat-messages
+            if (el.id !== 'chat-messages') {
+                el.remove();
+            }
+        });
     }
 
     setupEventListeners() {
@@ -193,50 +262,88 @@ export class ChatSystem {
 
     addMessage(text) {
         const messagesContainer = document.getElementById('chat-messages');
-        const messageElement = document.createElement('div');
-        messageElement.className = 'message';
-        messageElement.textContent = text;
         
-        messagesContainer.appendChild(messageElement);
+        // If there's no container, create it
+        if (!messagesContainer) {
+            this.setupUI(); // Recreate the UI
+        }
+        
+        // Get the container again (in case it was just created)
+        const container = document.getElementById('chat-messages');
+        
+        if (container) {
+            const messageElement = document.createElement('div');
+            messageElement.className = 'message';
+            messageElement.textContent = text;
+            
+            container.appendChild(messageElement);
+            
+            // Auto-scroll to the bottom
+            container.scrollTop = container.scrollHeight;
 
-        // Remove message after lifetime
-        setTimeout(() => {
-            messageElement.classList.add('fade-out');
+            // Remove message after lifetime
             setTimeout(() => {
-                if (messageElement.parentNode === messagesContainer) {
-                    messagesContainer.removeChild(messageElement);
-                }
-            }, 300); // Wait for fade animation
-        }, this.messageLifetime);
+                messageElement.classList.add('fade-out');
+                setTimeout(() => {
+                    if (messageElement.parentNode === container) {
+                        container.removeChild(messageElement);
+                    }
+                }, 300); // Wait for fade animation
+            }, this.messageLifetime);
 
-        // Store message
-        this.messages.push({
-            text,
-            timestamp: Date.now()
-        });
+            // Store message
+            this.messages.push({
+                text,
+                timestamp: Date.now()
+            });
 
-        // Keep only last 50 messages
-        if (this.messages.length > 50) {
-            this.messages.shift();
+            // Keep only last 50 messages
+            if (this.messages.length > 50) {
+                this.messages.shift();
+            }
         }
     }
 
     addSystemMessage(text) {
         const messagesContainer = document.getElementById('chat-messages');
-        const messageElement = document.createElement('div');
-        messageElement.className = 'message system-message';
-        messageElement.textContent = text;
         
-        messagesContainer.appendChild(messageElement);
+        // If there's no container, create it
+        if (!messagesContainer) {
+            this.setupUI(); // Recreate the UI
+        }
+        
+        // Get the container again (in case it was just created)
+        const container = document.getElementById('chat-messages');
+        
+        if (container) {
+            const messageElement = document.createElement('div');
+            messageElement.className = 'message system-message';
+            messageElement.textContent = text;
+            
+            container.appendChild(messageElement);
 
-        // Remove system message after lifetime
-        setTimeout(() => {
-            messageElement.classList.add('fade-out');
+            // Also store in our messages array
+            this.messages.push({
+                text,
+                isSystem: true,
+                timestamp: Date.now()
+            });
+
+            // Remove system message after lifetime
             setTimeout(() => {
-                if (messageElement.parentNode === messagesContainer) {
-                    messagesContainer.removeChild(messageElement);
-                }
-            }, 300);
-        }, this.messageLifetime);
+                messageElement.classList.add('fade-out');
+                setTimeout(() => {
+                    if (messageElement.parentNode === container) {
+                        container.removeChild(messageElement);
+                    }
+                }, 300);
+            }, this.messageLifetime);
+        }
+    }
+
+    update(deltaTime) {
+        // Update any time-based animations or effects here
+        // For now, we don't need to do anything in the update method
+        // as message fading is handled by CSS transitions
     }
 } 

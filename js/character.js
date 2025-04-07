@@ -307,11 +307,11 @@ export class Character {
         // Movement
         if (keys['ArrowLeft']) {
             this.characterState.velocity.x = -this.characterState.walkSpeed;
-            this.characterGroup.rotation.y = Math.PI / 2;
+            this.characterGroup.rotation.y = -Math.PI / 2;
         }
         if (keys['ArrowRight']) {
             this.characterState.velocity.x = this.characterState.walkSpeed;
-            this.characterGroup.rotation.y = -Math.PI / 2;
+            this.characterGroup.rotation.y = Math.PI / 2;
         }
         if (keys['ArrowUp']) {
             this.characterState.velocity.z = -this.characterState.walkSpeed;

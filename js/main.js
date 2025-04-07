@@ -16,7 +16,7 @@ const waitingRoomSpawnPoint = new THREE.Vector3(0, 1.0, 0);
 
 export class EBOYIsometricPierScene {
     constructor() {
-        console.log("Starting EBOYIsometricPierScene initialization...");
+        console.log("Starting IsometricPierScene initialization...");
         
         try {
             // Scene setup
@@ -39,11 +39,11 @@ export class EBOYIsometricPierScene {
             
             // Create portal to waiting room in main scene
             console.log("Creating portal to waiting room...");
-            const portalToWaitingRoomPos = new THREE.Vector3(10, 1.5, -5);
+            const portalToWaitingRoomPos = new THREE.Vector3(5, 2.5, -3);
             const portalToWaitingRoom = new Portal(
                 this.mainScene,
                 portalToWaitingRoomPos,
-                1.2,
+                1.5,
                 WAITING_ROOM_NAME,
                 waitingRoomSpawnPoint
             );
@@ -122,13 +122,59 @@ export class EBOYIsometricPierScene {
             // Initialize chat system with character reference
             console.log("Initializing chat system...");
             this.chatSystem = new ChatSystem(this.character);
+            
+            // Add a direct welcome message immediately
             this.chatSystem.addSystemMessage("Welcome to the Cyberpunk Pier! Press E to throw vinyl discs.");
+            
+            // Define a function to ensure the welcome message is visible
+            const ensureWelcomeMessage = () => {
+                console.log("Ensuring welcome message is visible...");
+                const chatMessages = document.getElementById('chat-messages');
+                
+                if (chatMessages) {
+                    // Make sure the container is properly styled and visible
+                    chatMessages.style.display = 'block';
+                    chatMessages.style.visibility = 'visible';
+                    chatMessages.style.opacity = '1';
+                    chatMessages.style.position = 'fixed';
+                    chatMessages.style.bottom = '80px';
+                    chatMessages.style.top = 'auto';
+                    
+                    // Check if we already have a welcome message
+                    let hasWelcomeMessage = false;
+                    Array.from(chatMessages.children).forEach(child => {
+                        if (child.textContent.includes("Welcome to the Cyberpunk Pier")) {
+                            hasWelcomeMessage = true;
+                        }
+                    });
+                    
+                    // If no welcome message found, add it again
+                    if (!hasWelcomeMessage) {
+                        console.log("No welcome message found, adding it again");
+                        this.chatSystem.addSystemMessage("Welcome to the Cyberpunk Pier! Press E to throw vinyl discs.");
+                    }
+                } else {
+                    console.log("Chat messages container not found, recreating it");
+                    this.chatSystem.setupUI(); // Recreate UI
+                    this.chatSystem.addSystemMessage("Welcome to the Cyberpunk Pier! Press E to throw vinyl discs.");
+                }
+            };
+            
+            // Ensure welcome message multiple times with increasing delays
+            // This addresses potential race conditions with our fixes
+            setTimeout(ensureWelcomeMessage, 100);
+            setTimeout(ensureWelcomeMessage, 500);
+            setTimeout(ensureWelcomeMessage, 1000);
+            setTimeout(ensureWelcomeMessage, 2000);
+            
+            // Also attempt to add the welcome message during the first animation frame
+            this.pendingWelcomeMessage = true;
             
             // Start animation loop
             console.log("Starting animation loop...");
             this.animate();
             
-            console.log("EBOY-Inspired Isometric Pier Scene successfully initialized!");
+            console.log("Isometric Pier Scene successfully initialized!");
         } catch (error) {
             console.error("Error during initialization:", error);
             throw error;
@@ -214,9 +260,9 @@ export class EBOYIsometricPierScene {
         for (let i = 0; i < particleCount; i++) {
             const i3 = i * 3;
             
-            // Random position in a wide area
+            // Random position in a wide area - keep away from camera view at top
             positions[i3] = (Math.random() - 0.5) * 100;     // x
-            positions[i3 + 1] = Math.random() * 50 + 20;    // y (start above scene)
+            positions[i3 + 1] = Math.random() * 30 + 30;    // y (start higher above scene to avoid UI)
             positions[i3 + 2] = (Math.random() - 0.5) * 100; // z
             
             // Random velocity (mostly downward with slight random movement)
@@ -241,9 +287,11 @@ export class EBOYIsometricPierScene {
         // Create particle system
         this.rain = new THREE.Points(geometry, material);
         
-        // Add rain to both scenes
+        // Add rain to both scenes - ensure this doesn't create DOM elements
         this.mainScene.add(this.rain);
-        this.waitingRoomScene.add(this.rain.clone());
+        // Clone the rain rather than create a new instance to ensure we don't get extra DOM elements
+        const rainClone = this.rain.clone();
+        this.waitingRoomScene.add(rainClone);
         
         // Store velocities for animation
         this.rainVelocities = velocities;
@@ -320,57 +368,69 @@ export class EBOYIsometricPierScene {
         
         const deltaTime = this.clock.getDelta();
         
-        // Update rain
-        this.updateRain(deltaTime);
-        
-        // Update character and check for portal activation
-        if (this.character) {
-            // Update character with current scene's portals
-            this.character.update(deltaTime, this.keys, this.camera);
-
-            // Check portal activation
-            const characterPos = this.character.characterGroup.position;
-            for (const portal of this.activePortals) {
-                portal.update(deltaTime);
-                if (portal.checkForActivation(characterPos)) {
-                    const target = portal.getTarget();
-                    this.switchScene(target.sceneName, target.spawnPoint);
-                    break;
+        // Check if we have a pending welcome message to show
+        if (this.pendingWelcomeMessage) {
+            const chatMessages = document.getElementById('chat-messages');
+            
+            if (chatMessages) {
+                let hasWelcomeMessage = false;
+                Array.from(chatMessages.children).forEach(child => {
+                    if (child.textContent.includes("Welcome to the Cyberpunk Pier")) {
+                        hasWelcomeMessage = true;
+                    }
+                });
+                
+                if (!hasWelcomeMessage) {
+                    console.log("Adding welcome message from animation loop");
+                    this.chatSystem.addSystemMessage("Welcome to the Cyberpunk Pier! Press E to throw vinyl discs.");
                 }
+                
+                // Make sure the container is visible
+                chatMessages.style.display = 'block';
+                chatMessages.style.visibility = 'visible';
+                chatMessages.style.opacity = '1';
+            }
+            
+            // Only try this for the first few frames
+            this.pendingWelcomeMessageCount = (this.pendingWelcomeMessageCount || 0) + 1;
+            if (this.pendingWelcomeMessageCount > 60) { // Try for about 1 second (60 frames)
+                this.pendingWelcomeMessage = false;
             }
         }
         
-        // Update NPCs only in main scene
-        if (this.npcs && this.currentScene === this.mainScene) {
-            this.npcs.forEach(npc => {
-                if (npc) {
-                    npc.update(deltaTime, this.keys, this.camera);
-                }
-            });
-        }
+        // Update rain
+        this.updateRain(deltaTime);
         
-        // Update decorative elements only in main scene
-        if (this.decorativeElements && this.currentScene === this.mainScene) {
-            this.decorativeElements.update(deltaTime);
-        }
+        // Update character
+        this.character.update(deltaTime, this.keys, this.camera, this.activePortals);
         
-        // Update billboard only in main scene
-        if (this.billboard && this.currentScene === this.mainScene) {
-            this.billboard.update(deltaTime);
-        }
+        // Update NPCs
+        this.npcs.forEach(npc => {
+            npc.update(deltaTime, this.camera);
+        });
         
-        // Animate neon lights only in main scene
-        const time = Date.now() * 0.001;
-        if (this.neonLights && this.currentScene === this.mainScene) {
-            this.neonLights.forEach((light, i) => {
-                light.intensity = 0.5 + Math.sin(time + i * 1.5) * 0.5;
-            });
-        }
+        // Update decorative elements
+        this.decorativeElements.update(deltaTime);
+        
+        // Update billboard
+        this.billboard.update(deltaTime);
+        
+        // Update chat system
+        this.chatSystem.update(deltaTime);
+        
+        // Update portals
+        this.activePortals.forEach(portal => {
+            portal.update(deltaTime);
+            if (portal.checkForActivation(this.character.getPosition())) {
+                const target = portal.getTarget();
+                this.switchScene(target.sceneName, target.spawnPoint);
+            }
+        });
         
         // Update camera
         this.updateCamera();
         
-        // Render the current scene
+        // Render current scene
         this.renderer.render(this.currentScene, this.camera);
     }
 } 

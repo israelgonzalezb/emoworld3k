@@ -43,6 +43,30 @@ export class NPC extends Character {
         // Apply colors to the character's materials
         this.applyColors(colors, hairColor);
         
+        // Setup speech bubble properties
+        this.speechTimer = 0;
+        this.speechInterval = 5 + Math.random() * 10; // Random interval between 5-15 seconds
+        this.lastMessage = '';
+        
+        // Define random messages
+        this.messages = [
+            "The matrix is glitching...",
+            "Have you seen my vinyl collection?",
+            "The pier's energy is off the charts!",
+            "I need more RGB in my life",
+            "Cyberpunk is not just a style, it's a lifestyle",
+            "The rain feels different today",
+            "My hoodie is literally glowing",
+            "The future is now, old man!",
+            "I can feel the bass in my bones",
+            "The neon never sleeps",
+            "My playlist is fire right now",
+            "The pier's got that perfect vibe",
+            "I'm feeling the cyber energy",
+            "The matrix is calling",
+            "Time to drop some beats"
+        ];
+        
         this.setupIdleBehavior();
         console.log("NPC created successfully with colors:", colors, "hair:", hairColor);
     }
@@ -96,10 +120,31 @@ export class NPC extends Character {
         this.idleState.shouldWaveArm = Math.random() < 0.3;
     }
 
-    update(deltaTime) {
+    update(deltaTime, camera) {
         if (!this.characterGroup) {
             console.error("NPC characterGroup is undefined");
             return;
+        }
+
+        // Update speech bubble timing
+        this.speechTimer += deltaTime;
+        if (this.speechTimer >= this.speechInterval) {
+            this.speechTimer = 0;
+            this.speechInterval = 5 + Math.random() * 10; // New random interval
+            
+            // Select a new random message different from the last one
+            let newMessage;
+            do {
+                newMessage = this.messages[Math.floor(Math.random() * this.messages.length)];
+            } while (newMessage === this.lastMessage);
+            
+            this.lastMessage = newMessage;
+            this.say(newMessage);
+        }
+
+        // Update speech bubble if active
+        if (this.activeSpeechBubble) {
+            this.activeSpeechBubble.update(this.characterGroup.position, camera);
         }
 
         // Update idle behavior

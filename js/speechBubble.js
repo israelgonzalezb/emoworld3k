@@ -122,8 +122,8 @@ export class SpeechBubble {
         this.group.add(triangle);
         this.group.add(triangleStroke);
 
-        // Position above character with slight offset
-        this.group.position.y = 2.2;
+        // Position above character with increased height
+        this.group.position.y = 2.5; // Increased from 2.2 to 2.5
         this.group.position.z = 0.2; // Slight forward offset
         
         // Add to scene
@@ -147,8 +147,9 @@ export class SpeechBubble {
     update(characterPosition, camera) {
         if (!this.group) return false;
 
-        // Update position to follow character
+        // Update position to follow character with increased height
         this.group.position.x = characterPosition.x;
+        this.group.position.y = characterPosition.y + 2.5; // Increased from 2.2 to 2.5
         this.group.position.z = characterPosition.z + 0.2; // Keep forward offset
 
         // Make bubble face camera with slight tilt
