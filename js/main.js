@@ -81,24 +81,28 @@ export class EBOYIsometricPierScene {
             // Basic lighting
             console.log("Setting up lighting...");
             this.setupLighting();
-            
-            // Initialize chat system (no longer needs character)
-            console.log("Initializing chat system...");
-            this.chatSystem = new ChatSystem();
 
             // Create scene elements
             console.log("Creating pier...");
             this.pier = new Pier(this.mainScene);
 
+            // Create player character FIRST
             console.log("Creating player character...");
-            // Pass chatSystem to Character and specify the spawn name
-            this.character = new Character(this.mainScene, this.chatSystem, 'Player');
+            // Pass a temporary placeholder for chatSystem initially
+            this.character = new Character(this.mainScene, null, 'Player'); 
             // ADDED: Explicitly set initial position and state
             this.character.characterGroup.position.copy(mainAreaSpawnPoint);
             this.character.characterState.x = mainAreaSpawnPoint.x;
             this.character.characterState.y = mainAreaSpawnPoint.y;
             this.character.characterState.z = mainAreaSpawnPoint.z;
             this.character.characterState.baseY = mainAreaSpawnPoint.y;
+            
+            // Initialize chat system and pass the player character
+            console.log("Initializing chat system...");
+            this.chatSystem = new ChatSystem(this.character);
+
+            // Now, assign the created chatSystem to the player character
+            this.character.chatSystem = this.chatSystem;
 
             console.log("Creating decorative elements...");
             this.decorativeElements = new DecorativeElements(this.mainScene);

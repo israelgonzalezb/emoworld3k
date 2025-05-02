@@ -1,10 +1,12 @@
 export class ChatSystem {
-    constructor() {
+    constructor(playerCharacter) {
         // Get references to UI elements created in index.html
         this.container = document.getElementById('chat-container');
         this.messageList = document.getElementById('chat-messages');
         this.inputField = document.getElementById('chat-input');
         this.submitButton = document.getElementById('chat-submit');
+
+        this.playerCharacter = playerCharacter;
 
         if (!this.container || !this.messageList || !this.inputField || !this.submitButton) {
             console.error("Chat UI elements (container, messages, input, or submit) not found in the DOM!");
@@ -61,8 +63,8 @@ export class ChatSystem {
     // Logic to handle message submission
     submitMessage() {
         const messageText = this.inputField.value.trim();
-        if (messageText) {
-            this.addPlayerMessage(messageText);
+        if (messageText && this.playerCharacter) {
+            this.playerCharacter.say(messageText);
             this.inputField.value = ''; // Clear the input field
             // Optional: Refocus input field after sending
             // this.inputField.focus(); 

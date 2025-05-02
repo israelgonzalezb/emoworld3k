@@ -145,8 +145,8 @@ export class NPC extends Character {
                  } while (newMessage === this.lastMessage && this.messages.length > 1);
 
                  this.lastMessage = newMessage;
-                 // MODIFIED: Send message to chat system instead of using say()
-                 this.chatSystem.addNPCMessage(this.name, newMessage);
+                 // MODIFIED: Use the character's say method for speech bubble
+                 this.say(newMessage); 
              }
         }
 

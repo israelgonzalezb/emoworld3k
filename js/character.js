@@ -655,8 +655,8 @@ export class Character {
             this.activeSpeechBubble.remove();
         }
         
-        // Create a new speech bubble
-        this.activeSpeechBubble = new SpeechBubble(message, this.scene);
+        // Create a new speech bubble with correct argument order
+        this.activeSpeechBubble = new SpeechBubble(this.scene, message); 
         // Initial position update will happen in the update loop
     }
 } 

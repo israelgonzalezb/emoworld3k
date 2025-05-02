@@ -105,7 +105,7 @@ export function createWaitingRoomScene(mainSceneName, mainAreaSpawnPoint) {
     );
     // Store portal reference in the scene for easy access during update
     scene.userData.portals = [returnPortal];
-    scene.userData.spawnPoint = new THREE.Vector3(0, 1, 0); // Default spawn point inside the room
+    scene.userData.spawnPoint = new THREE.Vector3(0, 2, 0); // Default spawn point inside the room
 
     return scene;
 }
