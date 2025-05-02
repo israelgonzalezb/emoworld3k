@@ -18,8 +18,8 @@ body {
     position: fixed;
     bottom: 20px; /* Position above potential input */
     left: 20px;
-    width: 350px; /* Adjust width as needed */
-    max-height: 200px; /* Limit height */
+    width: 500px; /* Increased width */
+    max-height: 300px; /* Increased height */
     background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent black */
     border: 1px solid #00ff00; /* Green border */
     border-radius: 5px;
@@ -40,7 +40,7 @@ body {
     overflow-y: auto; /* Enable vertical scrolling */
     flex-grow: 1; /* Allow messages list to take available space */
     color: #00ff00; /* Default text color */
-    font-size: 12px;
+    font-size: 14px; /* Increased font size */
 }
 
 /* Style scrollbar for webkit browsers */

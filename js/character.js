@@ -22,6 +22,7 @@ export class Character {
 
         // Add to scene
         this.scene.add(this.characterGroup);
+        console.log(`${this.name} added to scene:`, scene.uuid);
     }
 
     createCharacter() {
@@ -329,8 +330,8 @@ export class Character {
         this.rightShoe = this.characterGroup.children.find(child => 
             child.isGroup && child.position.x > 0);
 
-        // Add character to scene with adjusted base height
-        this.characterGroup.position.set(0, 1.1, 0);
+        // REMOVED: Add character to scene with adjusted base height
+        // this.characterGroup.position.set(0, 1.1, 0); 
     }
 
     // Helper method to get the character's AABB
@@ -350,100 +351,116 @@ export class Character {
     }
     
     update(deltaTime, keys, camera, obstacles = [], portals = []) {
-        // Handle movement input
+        // --- Player Input Processing --- 
         const moveDirection = new THREE.Vector3(0, 0, 0);
-        let isMoving = false;
+        let isPlayerMoving = false; // Use a local variable for input check
+        let playerWantsToShoot = false;
 
+        // Check movement keys (Only apply if this instance is player-controlled - NPCs pass empty keys)
         if (keys['ArrowUp']) {
             moveDirection.z -= 1;
-            isMoving = true;
+            isPlayerMoving = true;
         }
         if (keys['ArrowDown']) {
             moveDirection.z += 1;
-            isMoving = true;
+            isPlayerMoving = true;
         }
         if (keys['ArrowLeft']) {
             moveDirection.x -= 1;
-            isMoving = true;
+            isPlayerMoving = true;
         }
         if (keys['ArrowRight']) {
             moveDirection.x += 1;
-            isMoving = true;
+            isPlayerMoving = true;
         }
 
-        // Normalize movement vector
-        if (moveDirection.length() > 0) {
-            moveDirection.normalize();
+        // Check shoot key
+        const now = performance.now() / 1000;
+        if (keys['KeyE'] && (now - this.lastShootTime > this.shootCooldown)) {
+             playerWantsToShoot = true;
         }
 
-        // Apply movement speed
-        const moveVelocity = moveDirection.multiplyScalar(this.characterState.moveSpeed);
-        const currentVelocityX = this.characterState.velocity.x;
-        const currentVelocityZ = this.characterState.velocity.z;
-
-        // Smoothly interpolate horizontal velocity towards target velocity
-        this.characterState.velocity.x = THREE.MathUtils.lerp(currentVelocityX, moveVelocity.x, 0.1);
-        this.characterState.velocity.z = THREE.MathUtils.lerp(currentVelocityZ, moveVelocity.z, 0.1);
-
-        // Jumping logic
-        if (keys['ShiftLeft'] || keys['ShiftRight'] || keys['Space']) {
-            if (!this.characterState.isJumping) {
-                this.characterState.isJumping = true;
-                this.characterState.jumpVelocity = this.characterState.jumpForce;
+        // --- Update Velocity based on Input (if player) --- 
+        if (Object.keys(keys).length > 0) { // Assume player if keys are passed
+            if (isPlayerMoving) {
+                moveDirection.normalize();
+                const moveVelocity = moveDirection.multiplyScalar(this.characterState.moveSpeed);
+                // Smoothly interpolate horizontal velocity
+                this.characterState.velocity.x = THREE.MathUtils.lerp(this.characterState.velocity.x, moveVelocity.x, 0.1);
+                this.characterState.velocity.z = THREE.MathUtils.lerp(this.characterState.velocity.z, moveVelocity.z, 0.1);
+                 // Update rotation based on input direction
+                 this.characterState.rotation = Math.atan2(moveDirection.x, moveDirection.z);
+                 this.characterGroup.rotation.y = this.characterState.rotation;
+            } else {
+                 // Smoothly dampen horizontal velocity if no movement input
+                 this.characterState.velocity.x = THREE.MathUtils.lerp(this.characterState.velocity.x, 0, 0.1);
+                 this.characterState.velocity.z = THREE.MathUtils.lerp(this.characterState.velocity.z, 0, 0.1);
             }
-        }
+            
+            // Set animation state flags based on player input
+             this.characterState.isWalking = isPlayerMoving && !this.characterState.isJumping;
+             this.characterState.isIdle = !isPlayerMoving && !this.characterState.isJumping;
 
-        // Apply gravity
+             // Handle Shooting based on input
+              if (playerWantsToShoot) {
+                  this.lastShootTime = now;
+                  this.shootVinyl();
+                  if (this.chatSystem) { 
+                      this.chatSystem.addPlayerMessage("Flinging a disc!");
+                  } else {
+                      console.warn("Character: chatSystem not available to send message.");
+                  }
+             }
+        } 
+        // ELSE: If no keys are passed (NPC call), assume velocity/rotation/state is handled externally
+        
+        // --- Apply Gravity (Applies to both Player and NPC) --- 
         if (this.characterState.isJumping) {
             this.characterState.jumpVelocity += this.characterState.gravity * deltaTime;
             this.characterState.velocity.y = this.characterState.jumpVelocity;
         } else {
-            // Apply a small downward force when on ground to ensure contact
-            this.characterState.velocity.y = -1;
+            // Apply a small downward force when on ground to ensure contact/trigger landing
+            this.characterState.velocity.y = -1; 
         }
 
-        // --- Collision Detection and Resolution --- 
+        // --- Collision Detection and Resolution (Applies to both Player and NPC) --- 
         const currentPosition = this.characterGroup.position.clone();
-        let proposedPosition = currentPosition.clone().add(this.characterState.velocity.clone().multiplyScalar(deltaTime));
+        // Use the current velocity (set by player input or NPC logic)
+        let proposedPosition = currentPosition.clone().add(this.characterState.velocity.clone().multiplyScalar(deltaTime)); 
         
         const characterAABB = this.getAABB().translate(proposedPosition.clone().sub(currentPosition));
         let collisionOccurred = false;
         let verticalCollision = false;
+        let landedThisFrame = false;
 
         obstacles.forEach(obstacle => {
              if (characterAABB.intersectsBox(obstacle.aabb)) {
                  collisionOccurred = true;
-                 // Simple resolution: Stop movement in the collided direction
-                 // More sophisticated resolution would be needed for sliding etc.
                  
-                 // Check Y collision first
+                 // Resolve Y collision first
                  const tempAABB_Y = this.getAABB().translate(new THREE.Vector3(0, proposedPosition.y - currentPosition.y, 0));
                  if (tempAABB_Y.intersectsBox(obstacle.aabb)) {
                       verticalCollision = true;
-                      // If moving down and collided
-                      if (this.characterState.velocity.y <= 0) {
-                           // Landed on something
+                      if (this.characterState.velocity.y <= 0) { // Moving down
+                           landedThisFrame = true;
                            this.characterState.isJumping = false;
                            this.characterState.jumpVelocity = 0;
                            this.characterState.velocity.y = 0;
-                           // Adjust Y position to be just above the obstacle
                            proposedPosition.y = obstacle.aabb.max.y + (currentPosition.y - this.getAABB().min.y);
-                           // Update baseY when landing on a new surface
                            this.characterState.baseY = proposedPosition.y;
-                      } else {
-                           // Hit head while moving up
+                      } else { // Moving up (Hit head)
                            this.characterState.jumpVelocity = 0;
                            this.characterState.velocity.y = 0;
-                            // Adjust Y position to be just below the obstacle
-                           proposedPosition.y = obstacle.aabb.min.y - (this.getAABB().max.y - currentPosition.y) - 0.01; 
+                           proposedPosition.y = obstacle.aabb.min.y - (this.getAABB().max.y - currentPosition.y) - 0.01;
                       }
                  }
 
-                 // Check X collision 
+                 // Resolve X collision if no vertical collision resolved movement
                  const tempAABB_X = this.getAABB().translate(new THREE.Vector3(proposedPosition.x - currentPosition.x, 0, 0));
-                 if (!verticalCollision && tempAABB_X.intersectsBox(obstacle.aabb)) { 
+                 // Check intersection *only if Y didn't cause a landing this frame*
+                 // Or, allow X/Z resolution even if landed? Let's allow it for now.
+                 if (tempAABB_X.intersectsBox(obstacle.aabb)) { 
                      this.characterState.velocity.x = 0;
-                     // Adjust X position to be just outside the obstacle
                      if (proposedPosition.x > currentPosition.x) { // Moving right
                           proposedPosition.x = obstacle.aabb.min.x - (this.getAABB().max.x - currentPosition.x) - 0.01;
                      } else { // Moving left
@@ -451,11 +468,10 @@ export class Character {
                      }
                  }
                  
-                 // Check Z collision
+                 // Resolve Z collision if no vertical collision resolved movement
                  const tempAABB_Z = this.getAABB().translate(new THREE.Vector3(0, 0, proposedPosition.z - currentPosition.z));
-                  if (!verticalCollision && tempAABB_Z.intersectsBox(obstacle.aabb)) { 
+                 if (tempAABB_Z.intersectsBox(obstacle.aabb)) { 
                      this.characterState.velocity.z = 0;
-                     // Adjust Z position to be just outside the obstacle
                      if (proposedPosition.z > currentPosition.z) { // Moving forward (relative)
                           proposedPosition.z = obstacle.aabb.min.z - (this.getAABB().max.z - currentPosition.z) - 0.01;
                      } else { // Moving backward (relative)
@@ -468,71 +484,54 @@ export class Character {
         // Apply the potentially adjusted proposed position
         this.characterGroup.position.copy(proposedPosition);
 
-        // Prevent falling through floor (simple boundary check)
+        // Final ground check / prevent falling through floor
+        // Use baseY determined by collision or default
         if (this.characterGroup.position.y < this.characterState.baseY && !this.characterState.isJumping && !verticalCollision) {
             this.characterGroup.position.y = this.characterState.baseY;
             this.characterState.velocity.y = 0;
+            if (this.characterState.isJumping) { // Landed on ground
+                 landedThisFrame = true; 
+                 this.characterState.isJumping = false;
+                 this.characterState.jumpVelocity = 0;
+            }
         }
         
-        // Keep character within pier boundaries (if needed, might be handled by obstacles)
-        // this.characterGroup.position.x = Math.max(-19.5, Math.min(19.5, this.characterGroup.position.x));
-        // this.characterGroup.position.z = Math.max(-9.5, Math.min(9.5, this.characterGroup.position.z));
-
-        // Update internal state position
+        // Update internal state position from final group position
         this.characterState.x = this.characterGroup.position.x;
         this.characterState.y = this.characterGroup.position.y;
         this.characterState.z = this.characterGroup.position.z;
-
-        // --- Update Rotation --- 
-        if (isMoving) {
-            // Rotate character to face movement direction
-            this.characterState.rotation = Math.atan2(moveDirection.x, moveDirection.z);
-            this.characterGroup.rotation.y = this.characterState.rotation;
-        }
         
-        // --- Update Animations --- 
-        this.characterState.isWalking = isMoving && !this.characterState.isJumping; // Set walking state
-        this.characterState.isIdle = !isMoving && !this.characterState.isJumping; // Set idle state
-
+        // --- Update Animations (Based on current state flags) --- 
+        // State flags (isWalking, isIdle) are now set EITHER by player input OR by NPC logic before super.update()
         if (this.characterState.isWalking) {
             this.characterState.walkTime += deltaTime * this.characterState.walkSpeed;
             this.animateWalk(this.characterState.walkTime, this.characterState.walkAmplitude);
         } else if (this.characterState.isIdle) {
+             // Reset walk time when starting idle?
+             // this.characterState.walkTime = 0;
             this.characterState.idleAnimationTime += deltaTime * this.characterState.idleAnimationSpeed;
-            this.animateIdle(this.characterState.idleAnimationTime, this.characterState.shouldWaveArm);
+            // Use the shouldWaveArm state which might be set by NPC
+            this.animateIdle(this.characterState.idleAnimationTime, this.characterState.shouldWaveArm); 
         } else { // Jumping or falling
             this.setNeutralPose(); // Or a specific jump/fall pose
         }
 
-        // --- Handle Shooting --- 
-        const now = performance.now() / 1000; // Time in seconds
-        if (keys['KeyE'] && (now - this.lastShootTime > this.shootCooldown)) {
-            this.lastShootTime = now;
-            this.shootVinyl();
-            // ADDED: Send player message to chat system
-            if (this.chatSystem) { 
-                this.chatSystem.addPlayerMessage("Flinging a disc!");
-            } else {
-                console.warn("Character: chatSystem not available to send message.");
-            }
-        }
-
-        // Update existing vinyls
-        for (let i = this.vinyls.length - 1; i >= 0; i--) {
-            const vinyl = this.vinyls[i];
-            vinyl.update(deltaTime);
-            if (!vinyl.isActive) {
-                this.scene.remove(vinyl.mesh);
-                this.vinyls.splice(i, 1);
-            }
-        }
+        // --- Update Vinyls (Applies to Player only, NPCs don't shoot) --- 
+         if (Object.keys(keys).length > 0) { // Only update vinyls for player character
+             for (let i = this.vinyls.length - 1; i >= 0; i--) {
+                 const vinyl = this.vinyls[i];
+                 vinyl.update(deltaTime);
+                 if (!vinyl.isActive) {
+                     this.scene.remove(vinyl.mesh);
+                     this.vinyls.splice(i, 1);
+                 }
+             }
+         }
         
-        // --- Update Speech Bubble --- 
-        // ADDED: Update active speech bubble position
+        // --- Update Speech Bubble (Applies to both Player and NPC) --- 
         if (this.activeSpeechBubble && camera) {
-             // Position bubble above the character's head
              const headPosition = this.characterGroup.position.clone();
-             headPosition.y += 1.8; // Adjust height offset as needed
+             headPosition.y += 1.8; // Adjust height offset
              this.activeSpeechBubble.update(headPosition, camera);
         }
     }

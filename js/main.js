@@ -11,7 +11,7 @@ import { createWaitingRoomScene } from './waitingRoom.js';
 // Scene names and spawn points
 const MAIN_AREA_NAME = 'mainArea';
 const WAITING_ROOM_NAME = 'waitingRoom';
-const mainAreaSpawnPoint = new THREE.Vector3(0, 1.0, 5);
+const mainAreaSpawnPoint = new THREE.Vector3(0, 2., -4)
 const waitingRoomSpawnPoint = new THREE.Vector3(0, 1.0, 0);
 
 export class EBOYIsometricPierScene {
@@ -91,8 +91,14 @@ export class EBOYIsometricPierScene {
             this.pier = new Pier(this.mainScene);
 
             console.log("Creating player character...");
-            // Pass chatSystem to Character
-            this.character = new Character(this.mainScene, this.chatSystem);
+            // Pass chatSystem to Character and specify the spawn name
+            this.character = new Character(this.mainScene, this.chatSystem, 'Player');
+            // ADDED: Explicitly set initial position and state
+            this.character.characterGroup.position.copy(mainAreaSpawnPoint);
+            this.character.characterState.x = mainAreaSpawnPoint.x;
+            this.character.characterState.y = mainAreaSpawnPoint.y;
+            this.character.characterState.z = mainAreaSpawnPoint.z;
+            this.character.characterState.baseY = mainAreaSpawnPoint.y;
 
             console.log("Creating decorative elements...");
             this.decorativeElements = new DecorativeElements(this.mainScene);
@@ -126,7 +132,7 @@ export class EBOYIsometricPierScene {
             this.clock = new THREE.Clock();
             
             // Add the welcome message via the chat system
-            this.chatSystem.addSystemMessage("Welcome to the Cyberpunk Pier! Use Arrows to move, Shift to jump, E to throw discs.");
+            this.chatSystem.addSystemMessage("Welcome to the Cyberpunk Pier! Use Arrows to move, E to throw discs.");
             
             // Start animation loop
             console.log("Starting animation loop...");
