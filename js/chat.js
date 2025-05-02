@@ -3,17 +3,20 @@ export class ChatSystem {
         // Get references to UI elements created in index.html
         this.container = document.getElementById('chat-container');
         this.messageList = document.getElementById('chat-messages');
+        this.inputField = document.getElementById('chat-input');
+        this.submitButton = document.getElementById('chat-submit');
 
-        if (!this.container || !this.messageList) {
-            console.error("Chat UI elements not found in the DOM!");
+        if (!this.container || !this.messageList || !this.inputField || !this.submitButton) {
+            console.error("Chat UI elements (container, messages, input, or submit) not found in the DOM!");
             // Optionally, create them here as a fallback, but ideally they exist in HTML
             this.setupUIFallback(); 
+        } else {
+            this.setupEventListeners();
         }
 
         // No character reference needed here anymore
         // No message lifetime/fading needed for now
         // No style setup needed (handled by style.css)
-        // No event listener setup needed (no input form)
     }
 
     // Fallback in case HTML elements are missing
@@ -40,7 +43,29 @@ export class ChatSystem {
             this.messageList.style.padding = '5px 10px';
             this.messageList.style.margin = '0';
             this.messageList.style.overflowY = 'auto';
-             this.messageList.style.height = '100%'; // Fill container
+             this.messageList.style.height = 'calc(100% - 30px)'; // Adjust height for input
+        }
+    }
+
+    // Setup event listeners for input
+    setupEventListeners() {
+        this.submitButton.addEventListener('click', () => this.submitMessage());
+        this.inputField.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Prevent default form submission or line breaks
+                this.submitMessage();
+            }
+        });
+    }
+
+    // Logic to handle message submission
+    submitMessage() {
+        const messageText = this.inputField.value.trim();
+        if (messageText) {
+            this.addPlayerMessage(messageText);
+            this.inputField.value = ''; // Clear the input field
+            // Optional: Refocus input field after sending
+            // this.inputField.focus(); 
         }
     }
 
@@ -88,6 +113,6 @@ export class ChatSystem {
 
     // Removed update method and fading logic
     // Removed setupStyles
-    // Removed setupEventListeners
-    // Removed submitMessage
+    // Removed setupEventListeners (now part of constructor check)
+    // Removed submitMessage (re-added above)
 } 
