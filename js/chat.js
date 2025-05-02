@@ -64,7 +64,10 @@ export class ChatSystem {
     submitMessage() {
         const messageText = this.inputField.value.trim();
         if (messageText && this.playerCharacter) {
+            // Call say() on player character for bubble
             this.playerCharacter.say(messageText);
+            // ALSO add to chat log
+            this.addPlayerMessage(messageText);
             this.inputField.value = ''; // Clear the input field
             // Optional: Refocus input field after sending
             // this.inputField.focus(); 
