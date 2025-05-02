@@ -2,9 +2,12 @@ import { Character } from './character.js';
 import * as THREE from 'three';
 
 export class NPC extends Character {
-    constructor(scene, position) {
-        console.log("Creating NPC at position:", position);
-        super(scene);
+    constructor(scene, position, chatSystem, name) {
+        console.log(`Creating NPC ${name} at position:`, position);
+        super(scene, chatSystem, name);
+        
+        this.chatSystem = chatSystem;
+        
         this.characterGroup.position.copy(position);
         
         // Define cyberpunk color combinations for clothes
@@ -45,30 +48,30 @@ export class NPC extends Character {
         
         // Setup speech bubble properties
         this.speechTimer = 0;
-        this.speechInterval = 5 + Math.random() * 10; // Random interval between 5-15 seconds
+        this.speechInterval = 10 + Math.random() * 15; // Random interval between 10-25 seconds
         this.lastMessage = '';
         
         // Define random messages
         this.messages = [
-            "The matrix is glitching...",
-            "Have you seen my vinyl collection?",
-            "The pier's energy is off the charts!",
-            "I need more RGB in my life",
-            "Cyberpunk is not just a style, it's a lifestyle",
-            "The rain feels different today",
-            "My hoodie is literally glowing",
-            "The future is now, old man!",
-            "I can feel the bass in my bones",
-            "The neon never sleeps",
-            "My playlist is fire right now",
-            "The pier's got that perfect vibe",
-            "I'm feeling the cyber energy",
-            "The matrix is calling",
-            "Time to drop some beats"
+            "The rain feels electric tonight.",
+            "Did you see that glitch in the sky?",
+            "This pier has seen things...",
+            "Need more neon.",
+            "Keep the vibes flowing.",
+            "Watch out for the data streams.",
+            "My circuits are buzzing.",
+            "The future is bright... and rainy.",
+            "Synthwave and solitude.",
+            "Just contemplating the digital sea.",
+            "Is this real life?",
+            "Lost in the code.",
+            "These colors... wow.",
+            "Can't stop the signal.",
+            "Waiting for the next drop."
         ];
         
         this.setupIdleBehavior();
-        console.log("NPC created successfully with colors:", colors, "hair:", hairColor);
+        console.log(`NPC ${name} created successfully.`);
     }
 
     applyColors(colors, hairColor) {
@@ -122,160 +125,84 @@ export class NPC extends Character {
 
     update(deltaTime, camera) {
         if (!this.characterGroup) {
-            console.error("NPC characterGroup is undefined");
+            console.error(`NPC ${this.name} characterGroup is undefined`);
             return;
         }
+        if (!this.chatSystem) {
+             console.error(`NPC ${this.name} chatSystem is undefined`);
+             // Don't proceed with chat logic if system is missing
+        } else {
+             // Update speech timing
+             this.speechTimer += deltaTime;
+             if (this.speechTimer >= this.speechInterval) {
+                 this.speechTimer = 0;
+                 this.speechInterval = 10 + Math.random() * 15; // New random interval
 
-        // Update speech bubble timing
-        this.speechTimer += deltaTime;
-        if (this.speechTimer >= this.speechInterval) {
-            this.speechTimer = 0;
-            this.speechInterval = 5 + Math.random() * 10; // New random interval
-            
-            // Select a new random message different from the last one
-            let newMessage;
-            do {
-                newMessage = this.messages[Math.floor(Math.random() * this.messages.length)];
-            } while (newMessage === this.lastMessage);
-            
-            this.lastMessage = newMessage;
-            this.say(newMessage);
+                 // Select a new random message different from the last one
+                 let newMessage;
+                 do {
+                     newMessage = this.messages[Math.floor(Math.random() * this.messages.length)];
+                 } while (newMessage === this.lastMessage && this.messages.length > 1);
+
+                 this.lastMessage = newMessage;
+                 // MODIFIED: Send message to chat system instead of using say()
+                 this.chatSystem.addNPCMessage(this.name, newMessage);
+             }
         }
 
-        // Update speech bubble if active
-        if (this.activeSpeechBubble) {
-            this.activeSpeechBubble.update(this.characterGroup.position, camera);
-        }
+        // Update speech bubble if active (Let Character class handle this)
+        // if (this.activeSpeechBubble) { 
+        //     this.activeSpeechBubble.update(this.characterGroup.position, camera);
+        // }
+        // We call the parent update method AFTER our NPC-specific logic
+        // This ensures the base Character update (movement, animations, speech bubble update) runs.
+        super.update(deltaTime, {}, camera, [], []); // Pass empty keys, obstacles, portals for base update
 
-        // Update idle behavior
-        this.idleState.idleTimer += deltaTime;
-        
+        // --- NPC Idle Movement Logic (moved from Character.update) ---
+        // Update idle behavior timer (previously part of Character update, now specific to NPC)
+        // this.idleState.idleTimer += deltaTime; // Timer update handled by base Character class now if needed
+
         if (this.idleState.isMoving) {
             // Calculate direction to target
             const direction = this.idleState.targetPosition.clone()
                 .sub(this.characterGroup.position);
             const distance = direction.length();
-            
+
             if (distance > 0.1) {
                 // Normalize and apply movement
                 direction.normalize();
-                this.characterState.x += direction.x * this.idleState.moveSpeed * deltaTime;
-                this.characterState.z += direction.z * this.idleState.moveSpeed * deltaTime;
-                
+                this.characterGroup.position.x += direction.x * this.idleState.moveSpeed * deltaTime;
+                this.characterGroup.position.z += direction.z * this.idleState.moveSpeed * deltaTime;
+
                 // Update rotation to face movement direction
-                this.characterState.rotation = Math.atan2(direction.x, direction.z);
-                
-                // Update walk animation
-                this.characterState.walkTime += deltaTime * this.characterState.walkSpeed;
-                
-                // Walking arm animations
-                if (this.leftArm && this.rightArm) {
-                    const leftArmAngle = -Math.sin(this.characterState.walkTime) * this.characterState.walkAmplitude * 0.7;
-                    const rightArmAngle = -Math.sin(this.characterState.walkTime + Math.PI) * this.characterState.walkAmplitude * 0.7;
-                    
-                    this.leftArm.rotation.x = leftArmAngle;
-                    this.rightArm.rotation.x = rightArmAngle;
-                    
-                    // Add slight side-to-side motion
-                    this.leftArm.rotation.z = 0.15 + Math.sin(this.characterState.walkTime) * 0.1;
-                    this.rightArm.rotation.z = -0.15 - Math.sin(this.characterState.walkTime) * 0.1;
-                }
-                
-                // Walking leg animations
-                if (this.leftLeg && this.rightLeg) {
-                    const leftLegAngle = Math.sin(this.characterState.walkTime) * this.characterState.walkAmplitude;
-                    const rightLegAngle = Math.sin(this.characterState.walkTime + Math.PI) * this.characterState.walkAmplitude;
-                    
-                    this.leftLeg.rotation.x = leftLegAngle + 0.1;
-                    this.rightLeg.rotation.x = rightLegAngle - 0.1;
-                    
-                    this.leftLeg.position.y = -0.15 + Math.abs(Math.sin(this.characterState.walkTime)) * 0.1;
-                    this.rightLeg.position.y = -0.15 + Math.abs(Math.sin(this.characterState.walkTime + Math.PI)) * 0.1;
-                    
-                    // Animate shoes
-                    if (this.leftShoe && this.rightShoe) {
-                        this.leftShoe.rotation.x = leftLegAngle + 0.1;
-                        this.rightShoe.rotation.x = rightLegAngle - 0.1;
-                        
-                        this.leftShoe.position.y = -0.7 + Math.abs(Math.sin(this.characterState.walkTime)) * 0.1;
-                        this.rightShoe.position.y = -0.7 + Math.abs(Math.sin(this.characterState.walkTime + Math.PI)) * 0.1;
-                        
-                        this.leftShoe.position.z = Math.sin(this.characterState.walkTime) * 0.15;
-                        this.rightShoe.position.z = Math.sin(this.characterState.walkTime + Math.PI) * 0.15;
-                    }
-                }
+                this.characterGroup.rotation.y = Math.atan2(direction.x, direction.z);
+
+                // Update walk animation state (handled by base Character class)
+                this.characterState.isWalking = true; 
+
             } else {
                 // Reached target position, start waiting
                 this.idleState.isMoving = false;
                 this.idleState.waitTime = 0;
-                
-                // Reset legs to idle position
-                if (this.leftLeg && this.rightLeg) {
-                    this.leftLeg.rotation.x = 0.1;
-                    this.rightLeg.rotation.x = -0.1;
-                    this.leftLeg.position.y = -0.15;
-                    this.rightLeg.position.y = -0.15;
-                }
-                
-                if (this.leftShoe && this.rightShoe) {
-                    this.leftShoe.rotation.x = 0.1;
-                    this.rightShoe.rotation.x = -0.1;
-                    this.leftShoe.position.y = -0.7;
-                    this.rightShoe.position.y = -0.7;
-                    this.leftShoe.position.z = 0;
-                    this.rightShoe.position.z = 0;
-                }
+                this.characterState.isWalking = false; // Stop walking animation state
+                // Update target position after waiting
+                // We'll handle this in the waiting section below
             }
         } else {
             // Update waiting time
             this.idleState.waitTime += deltaTime;
-            
-            // Idle animations
-            if (this.leftArm && this.rightArm) {
-                this.idleState.idleAnimationTime += deltaTime * this.idleState.idleAnimationSpeed;
-                
-                if (this.idleState.shouldWaveArm) {
-                    // Wave animation for right arm
-                    const waveAngle = Math.sin(this.idleState.idleAnimationTime * 2) * 0.5;
-                    this.rightArm.rotation.z = -0.15 - waveAngle;
-                    this.rightArm.rotation.x = -0.5 + Math.sin(this.idleState.idleAnimationTime) * 0.2;
-                    
-                    // Subtle movement for left arm
-                    this.leftArm.rotation.x = Math.sin(this.idleState.idleAnimationTime * 0.5) * 0.1;
-                } else {
-                    // Subtle idle arm movements
-                    this.leftArm.rotation.x = Math.sin(this.idleState.idleAnimationTime * 0.5) * 0.1;
-                    this.rightArm.rotation.x = Math.sin(this.idleState.idleAnimationTime * 0.5 + Math.PI) * 0.1;
-                    
-                    // Maintain slight outward angle
-                    this.leftArm.rotation.z = 0.15 + Math.sin(this.idleState.idleAnimationTime * 0.3) * 0.05;
-                    this.rightArm.rotation.z = -0.15 - Math.sin(this.idleState.idleAnimationTime * 0.3) * 0.05;
-                }
-            }
-            
-            // Check if wait time is over
+            this.characterState.isWalking = false; // Ensure not walking while waiting
+
+            // Perform idle animations (handled by base Character class)
+            this.characterState.isIdle = true;
+            this.characterState.shouldWaveArm = this.idleState.shouldWaveArm; // Pass waving state
+
+            // If wait time exceeded, find a new target
             if (this.idleState.waitTime >= this.idleState.maxWaitTime) {
                 this.updateTargetPosition();
+                this.characterState.isIdle = false; // Start moving again
             }
         }
-
-        // Check if it's time to pick a new target
-        if (this.idleState.idleTimer >= this.idleState.idleDuration) {
-            this.idleState.idleTimer = 0;
-            this.idleState.idleDuration = 3 + Math.random() * 4;
-            this.updateTargetPosition();
-        }
-
-        // Keep NPC within pier boundaries
-        this.characterState.x = Math.max(-19.5, Math.min(19.5, this.characterState.x));
-        this.characterState.z = Math.max(-9.5, Math.min(9.5, this.characterState.z));
-        
-        // Update character position and rotation
-        this.characterGroup.position.set(
-            this.characterState.x,
-            this.characterState.y,
-            this.characterState.z
-        );
-        this.characterGroup.rotation.y = this.characterState.rotation;
+        // --- End NPC Idle Movement Logic ---
     }
 } 

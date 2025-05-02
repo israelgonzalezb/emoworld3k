@@ -36,7 +36,7 @@ export class SpeechBubble {
         context.stroke();
         
         // Draw text with improved font and size
-        context.font = 'bold 16px Arial';
+        context.font = 'bold 32px Arial';
         context.fillStyle = '#00ff9d';
         context.textAlign = 'center';
         context.textBaseline = 'middle';
@@ -46,9 +46,31 @@ export class SpeechBubble {
         let line = '';
         let lines = [];
         const maxWidth = canvas.width - 40;
-        const lineHeight = 20;
+        const lineHeight = 40;
 
         for (let word of words) {
+            // Check if the word itself is too long
+            const wordMetrics = context.measureText(word);
+            if (wordMetrics.width > maxWidth) {
+                // Handle very long words (e.g., truncate or split - here we truncate)
+                // A more sophisticated approach might split the word
+                console.warn(`Word "${word}" is too long for the speech bubble.`);
+                // Basic truncation: find how many chars fit
+                let truncatedWord = '';
+                for (let k = 1; k <= word.length; k++) {
+                    if (context.measureText(truncatedWord + word[k]).width > maxWidth) {
+                        break;
+                    }
+                    truncatedWord += word[k];
+                }
+                 // If even the first char is too long, use a placeholder
+                 if (truncatedWord === '') {
+                    word = '...'; 
+                 } else {
+                    word = truncatedWord + '...';
+                 }
+            }
+
             const testLine = line + word + ' ';
             const metrics = context.measureText(testLine);
             
@@ -75,7 +97,7 @@ export class SpeechBubble {
         texture.needsUpdate = true;
 
         // Create speech bubble plane with adjusted size
-        const geometry = new THREE.PlaneGeometry(1.2, 0.6);
+        const geometry = new THREE.PlaneGeometry(2.4, 1.2);
         const material = new THREE.MeshBasicMaterial({
             map: texture,
             transparent: true,

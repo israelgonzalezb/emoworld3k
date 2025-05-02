@@ -82,19 +82,24 @@ export class EBOYIsometricPierScene {
             console.log("Setting up lighting...");
             this.setupLighting();
             
+            // Initialize chat system (no longer needs character)
+            console.log("Initializing chat system...");
+            this.chatSystem = new ChatSystem();
+
             // Create scene elements
             console.log("Creating pier...");
             this.pier = new Pier(this.mainScene);
-            
+
             console.log("Creating player character...");
-            this.character = new Character(this.mainScene);
-            
+            // Pass chatSystem to Character
+            this.character = new Character(this.mainScene, this.chatSystem);
+
             console.log("Creating decorative elements...");
             this.decorativeElements = new DecorativeElements(this.mainScene);
-            
+
             console.log("Creating billboard...");
             this.billboard = new Billboard(this.mainScene);
-            
+
             // Create NPCs
             console.log("Creating NPCs...");
             this.npcs = [];
@@ -104,7 +109,8 @@ export class EBOYIsometricPierScene {
                     0.9,
                     (Math.random() - 0.5) * 18
                 );
-                this.npcs.push(new NPC(this.mainScene, position));
+                // Pass chatSystem to NPC
+                this.npcs.push(new NPC(this.mainScene, position, this.chatSystem, `NPC-${i + 1}`));
             }
             
             // Input handling
@@ -119,56 +125,8 @@ export class EBOYIsometricPierScene {
             // Clock for frame-rate independent movement
             this.clock = new THREE.Clock();
             
-            // Initialize chat system with character reference
-            console.log("Initializing chat system...");
-            this.chatSystem = new ChatSystem(this.character);
-            
-            // Add a direct welcome message immediately
-            this.chatSystem.addSystemMessage("Welcome to the Cyberpunk Pier! Press E to throw vinyl discs.");
-            
-            // Define a function to ensure the welcome message is visible
-            const ensureWelcomeMessage = () => {
-                console.log("Ensuring welcome message is visible...");
-                const chatMessages = document.getElementById('chat-messages');
-                
-                if (chatMessages) {
-                    // Make sure the container is properly styled and visible
-                    chatMessages.style.display = 'block';
-                    chatMessages.style.visibility = 'visible';
-                    chatMessages.style.opacity = '1';
-                    chatMessages.style.position = 'fixed';
-                    chatMessages.style.bottom = '80px';
-                    chatMessages.style.top = 'auto';
-                    
-                    // Check if we already have a welcome message
-                    let hasWelcomeMessage = false;
-                    Array.from(chatMessages.children).forEach(child => {
-                        if (child.textContent.includes("Welcome to the Cyberpunk Pier")) {
-                            hasWelcomeMessage = true;
-                        }
-                    });
-                    
-                    // If no welcome message found, add it again
-                    if (!hasWelcomeMessage) {
-                        console.log("No welcome message found, adding it again");
-                        this.chatSystem.addSystemMessage("Welcome to the Cyberpunk Pier! Press E to throw vinyl discs.");
-                    }
-                } else {
-                    console.log("Chat messages container not found, recreating it");
-                    this.chatSystem.setupUI(); // Recreate UI
-                    this.chatSystem.addSystemMessage("Welcome to the Cyberpunk Pier! Press E to throw vinyl discs.");
-                }
-            };
-            
-            // Ensure welcome message multiple times with increasing delays
-            // This addresses potential race conditions with our fixes
-            setTimeout(ensureWelcomeMessage, 100);
-            setTimeout(ensureWelcomeMessage, 500);
-            setTimeout(ensureWelcomeMessage, 1000);
-            setTimeout(ensureWelcomeMessage, 2000);
-            
-            // Also attempt to add the welcome message during the first animation frame
-            this.pendingWelcomeMessage = true;
+            // Add the welcome message via the chat system
+            this.chatSystem.addSystemMessage("Welcome to the Cyberpunk Pier! Use Arrows to move, Shift to jump, E to throw discs.");
             
             // Start animation loop
             console.log("Starting animation loop...");
@@ -212,7 +170,7 @@ export class EBOYIsometricPierScene {
         this.keys[event.code] = true;
         
         // Prevent default behavior for arrow keys and space
-        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyE'].includes(event.code)) {
             event.preventDefault();
         }
     }
@@ -361,49 +319,78 @@ export class EBOYIsometricPierScene {
 
         // Update character's scene reference
         this.character.scene = this.currentScene;
+        // Update character's chat system reference (though it's the same instance)
+        this.character.chatSystem = this.chatSystem;
     }
 
     animate() {
         requestAnimationFrame(() => this.animate());
         
         const deltaTime = this.clock.getDelta();
-        
-        // Check if we have a pending welcome message to show
-        if (this.pendingWelcomeMessage) {
-            const chatMessages = document.getElementById('chat-messages');
-            
-            if (chatMessages) {
-                let hasWelcomeMessage = false;
-                Array.from(chatMessages.children).forEach(child => {
-                    if (child.textContent.includes("Welcome to the Cyberpunk Pier")) {
-                        hasWelcomeMessage = true;
-                    }
-                });
-                
-                if (!hasWelcomeMessage) {
-                    console.log("Adding welcome message from animation loop");
-                    this.chatSystem.addSystemMessage("Welcome to the Cyberpunk Pier! Press E to throw vinyl discs.");
+
+        // --- Prepare Obstacles for Collision --- 
+        const obstacles = [];
+        const tempBox = new THREE.Box3(); // Reuse Box3 object for efficiency
+
+        // Add pier elements (assuming pier object has meshes/groups)
+        // Example: Check if pier.pierGroup exists and is a group
+        if (this.pier && this.pier.pierGroup) {
+            this.pier.pierGroup.traverse((child) => {
+                if (child.isMesh) {
+                    // We need a way to identify collidable parts vs non-collidable (like water)
+                    // For now, let's assume all pier meshes are collidable
+                    tempBox.setFromObject(child); 
+                    obstacles.push({ aabb: tempBox.clone(), object: child });
                 }
-                
-                // Make sure the container is visible
-                chatMessages.style.display = 'block';
-                chatMessages.style.visibility = 'visible';
-                chatMessages.style.opacity = '1';
-            }
-            
-            // Only try this for the first few frames
-            this.pendingWelcomeMessageCount = (this.pendingWelcomeMessageCount || 0) + 1;
-            if (this.pendingWelcomeMessageCount > 60) { // Try for about 1 second (60 frames)
-                this.pendingWelcomeMessage = false;
-            }
+            });
+        } else if (this.pier && this.pier.isMesh) { // If pier itself is a single mesh
+             tempBox.setFromObject(this.pier); 
+             obstacles.push({ aabb: tempBox.clone(), object: this.pier });
         }
-        
-        // Update rain
-        this.updateRain(deltaTime);
-        
-        // Update character
-        this.character.update(deltaTime, this.keys, this.camera, this.activePortals);
-        
+
+        // Add decorative elements (assuming they have meshes/groups)
+        // Example: Iterate through decorativeElements array or group
+        if (this.decorativeElements && this.decorativeElements.elementsGroup) {
+            this.decorativeElements.elementsGroup.traverse((child) => {
+                if (child.isMesh) { 
+                    // Add logic here if some decoratives are non-collidable
+                     tempBox.setFromObject(child);
+                     obstacles.push({ aabb: tempBox.clone(), object: child });
+                }
+            });
+        } 
+
+         // Add billboard (assuming billboard.mesh exists)
+         if (this.billboard && this.billboard.billboardGroup) { // Check for billboardGroup
+            tempBox.setFromObject(this.billboard.billboardGroup);
+            obstacles.push({ aabb: tempBox.clone(), object: this.billboard.billboardGroup });
+        } else if (this.billboard && this.billboard.mesh) { // Fallback to mesh if no group
+            tempBox.setFromObject(this.billboard.mesh);
+            obstacles.push({ aabb: tempBox.clone(), object: this.billboard.mesh });
+        }
+
+        // Add NPCs
+        this.npcs.forEach(npc => {
+            if (npc.npcGroup) { // Assuming npc has an npcGroup
+                tempBox.setFromObject(npc.npcGroup);
+                obstacles.push({ aabb: tempBox.clone(), object: npc.npcGroup });
+            }
+        });
+
+         // Add active portals (assuming portal.portalMesh exists)
+         this.activePortals.forEach(portal => {
+             if (portal.portalMesh) {
+                 // Portals might not be solid obstacles, decide if they should be added
+                 // tempBox.setFromObject(portal.portalMesh);
+                 // obstacles.push({ aabb: tempBox.clone(), object: portal.portalMesh });
+             }
+         });
+
+        // --- Update Game Elements --- 
+
+        // Update character (pass obstacles)
+        this.character.update(deltaTime, this.keys, this.camera, obstacles, this.activePortals);
+
         // Update NPCs
         this.npcs.forEach(npc => {
             npc.update(deltaTime, this.camera);
@@ -414,9 +401,6 @@ export class EBOYIsometricPierScene {
         
         // Update billboard
         this.billboard.update(deltaTime);
-        
-        // Update chat system
-        this.chatSystem.update(deltaTime);
         
         // Update portals
         this.activePortals.forEach(portal => {
@@ -429,6 +413,9 @@ export class EBOYIsometricPierScene {
         
         // Update camera
         this.updateCamera();
+        
+        // Update rain
+        this.updateRain(deltaTime);
         
         // Render current scene
         this.renderer.render(this.currentScene, this.camera);

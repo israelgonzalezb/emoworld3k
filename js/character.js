@@ -2,10 +2,13 @@ import * as THREE from 'three';
 import { createStandardMaterial, createBoxGeometry } from './utils.js';
 import { Vinyl } from './vinyl.js';
 import { SpeechBubble } from './speechBubble.js';
+import { Box3 } from 'three'; // Import Box3
 
 export class Character {
-    constructor(scene) {
+    constructor(scene, chatSystem, name = 'Character') {
         this.scene = scene;
+        this.chatSystem = chatSystem; // Store chatSystem
+        this.name = name; // Store name
         this.createCharacter();
         this.setupState();
         
@@ -24,6 +27,7 @@ export class Character {
     createCharacter() {
         // Create character group
         this.characterGroup = new THREE.Group();
+        this.characterGroup.name = this.name; // Assign name to group
         
         // Body - slim hoodie with better proportions
         const bodyGeometry = createBoxGeometry(0.5, 1.2, 0.3); // Slimmer body
@@ -200,12 +204,14 @@ export class Character {
         leftArm.position.set(-0.32, 0.6, 0);
         leftArm.rotation.z = 0.1;
         leftArm.name = 'leftArm';
+        this.leftArm = leftArm; // Store reference
         this.characterGroup.add(leftArm);
         
         const rightArm = new THREE.Mesh(armGeometry, armMaterial);
         rightArm.position.set(0.32, 0.6, 0);
         rightArm.rotation.z = -0.1;
         rightArm.name = 'rightArm';
+        this.rightArm = rightArm; // Store reference
         this.characterGroup.add(rightArm);
         
         // Legs - skinny jeans style
@@ -216,12 +222,14 @@ export class Character {
         leftLeg.position.set(-0.12, -0.15, 0);
         leftLeg.rotation.x = 0.1;
         leftLeg.name = 'leftLeg';
+        this.leftLeg = leftLeg; // Store reference
         this.characterGroup.add(leftLeg);
         
         const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
         rightLeg.position.set(0.12, -0.15, 0);
         rightLeg.rotation.x = -0.1;
         rightLeg.name = 'rightLeg';
+        this.rightLeg = rightLeg; // Store reference
         this.characterGroup.add(rightLeg);
         
         // Shoes - detailed sneaker style
@@ -247,18 +255,41 @@ export class Character {
             const laceMaterial = createStandardMaterial(0xFFFFFF, 0.9);
             for (let i = 0; i < 3; i++) {
                 const lace = new THREE.Mesh(laceGeometry, laceMaterial);
-                lace.position.set(0, 0.08, 0.12 - i * 0.1);
+                lace.position.set(0, 0.08 + (i * 0.03), 0.2);
+                lace.rotation.x = -0.1;
                 sneakerGroup.add(lace);
             }
+
+            // Tongue
+            const tongueGeometry = createBoxGeometry(0.18, 0.1, 0.05);
+            const tongueMaterial = createStandardMaterial(0x333333, 0.9);
+            const tongue = new THREE.Mesh(tongueGeometry, tongueMaterial);
+            tongue.position.set(0, 0.12, 0.16); 
+            tongue.rotation.x = -0.5;
+            sneakerGroup.add(tongue);
             
-            // Position the complete shoe
-            sneakerGroup.position.set(isLeft ? -0.15 : 0.15, -0.5, 0);
-            sneakerGroup.rotation.x = isLeft ? 0.1 : -0.1;
+            // Heel tab
+            const heelGeometry = createBoxGeometry(0.15, 0.1, 0.05);
+            const heelMaterial = createStandardMaterial(0x444444, 0.9);
+            const heel = new THREE.Mesh(heelGeometry, heelMaterial);
+            heel.position.set(0, 0.1, -0.2);
+            heel.rotation.x = 0.3;
+            sneakerGroup.add(heel);
+            
             return sneakerGroup;
         };
-        
-        this.characterGroup.add(createSneaker(true)); // Left shoe
-        this.characterGroup.add(createSneaker(false)); // Right shoe
+
+        this.leftShoe = createSneaker(true);
+        this.leftShoe.position.set(-0.12, -0.7, 0.1);
+        this.leftShoe.rotation.x = 0.1;
+        this.leftShoe.name = 'leftShoe';
+        this.characterGroup.add(this.leftShoe);
+
+        this.rightShoe = createSneaker(false);
+        this.rightShoe.position.set(0.12, -0.7, 0.1);
+        this.rightShoe.rotation.x = -0.1;
+        this.rightShoe.name = 'rightShoe';
+        this.characterGroup.add(this.rightShoe);
         
         // Add character to scene with adjusted base height
         this.characterGroup.position.set(0, 1.1, 0);
@@ -266,23 +297,26 @@ export class Character {
 
     setupState() {
         this.characterState = {
-            x: 0,
-            y: 1.1,
-            z: 0,
-            baseY: 1.1,
-            velocity: new THREE.Vector3(0, 0, 0),
+            x: this.characterGroup.position.x,
+            y: this.characterGroup.position.y,
+            z: this.characterGroup.position.z,
+            rotation: 0,
+            moveSpeed: 5,
+            jumpForce: 8,
+            gravity: -15,
+            velocity: new THREE.Vector3(),
             isJumping: false,
             jumpVelocity: 0,
-            walkSpeed: 5,
-            jumpForce: 8,
-            gravity: 20,
-            rotation: 0,
+            baseY: 1.0, // Ground level
+            // Animation states
             walkTime: 0,
-            walkAmplitude: 0.4,
-            // Add arm animation states
-            throwingArm: false,
-            throwTime: 0,
-            throwDuration: 0.3 // Duration of throw animation in seconds
+            walkSpeed: 10,
+            walkAmplitude: 0.3,
+            isWalking: false,
+            isIdle: true,
+            idleAnimationTime: Math.random() * Math.PI * 2, 
+            idleAnimationSpeed: 0.5 + Math.random() * 0.5,
+            shouldWaveArm: false, // Controlled by NPC logic or player input if desired
         };
 
         // Store references to legs and arms for animation
@@ -299,149 +333,331 @@ export class Character {
         this.characterGroup.position.set(0, 1.1, 0);
     }
 
-    update(deltaTime, keys, camera, portals = []) {
-        // Update character state
-        this.characterState.velocity.x = 0;
-        this.characterState.velocity.z = 0;
+    // Helper method to get the character's AABB
+    getAABB() {
+        if (!this._aabb) {
+            this._aabb = new THREE.Box3();
+        }
+        // Slightly adjust AABB if needed for better collision detection
+        const size = new THREE.Vector3();
+        const center = new THREE.Vector3();
+        this.characterGroup.children[0].geometry.computeBoundingBox(); // Assuming body is first child
+        this._aabb.copy(this.characterGroup.children[0].geometry.boundingBox).applyMatrix4(this.characterGroup.matrixWorld);
+        
+        // Optional: Expand the box slightly for safety margin
+        // this._aabb.expandByScalar(0.1);
+        return this._aabb;
+    }
+    
+    update(deltaTime, keys, camera, obstacles = [], portals = []) {
+        // Handle movement input
+        const moveDirection = new THREE.Vector3(0, 0, 0);
+        let isMoving = false;
 
-        // Movement
-        if (keys['ArrowLeft']) {
-            this.characterState.velocity.x = -this.characterState.walkSpeed;
-            this.characterGroup.rotation.y = -Math.PI / 2;
-        }
-        if (keys['ArrowRight']) {
-            this.characterState.velocity.x = this.characterState.walkSpeed;
-            this.characterGroup.rotation.y = Math.PI / 2;
-        }
         if (keys['ArrowUp']) {
-            this.characterState.velocity.z = -this.characterState.walkSpeed;
-            this.characterGroup.rotation.y = Math.PI;
+            moveDirection.z -= 1;
+            isMoving = true;
         }
         if (keys['ArrowDown']) {
-            this.characterState.velocity.z = this.characterState.walkSpeed;
-            this.characterGroup.rotation.y = 0;
+            moveDirection.z += 1;
+            isMoving = true;
+        }
+        if (keys['ArrowLeft']) {
+            moveDirection.x -= 1;
+            isMoving = true;
+        }
+        if (keys['ArrowRight']) {
+            moveDirection.x += 1;
+            isMoving = true;
         }
 
-        // Update walking animation
-        const isMoving = keys['ArrowLeft'] || keys['ArrowRight'] || keys['ArrowUp'] || keys['ArrowDown'];
-        if (isMoving) {
-            this.characterState.walkTime += deltaTime * this.characterState.walkSpeed;
-            
-            // Leg animation
-            if (this.leftLeg && this.rightLeg) {
-                this.leftLeg.rotation.x = Math.sin(this.characterState.walkTime) * this.characterState.walkAmplitude;
-                this.rightLeg.rotation.x = -Math.sin(this.characterState.walkTime) * this.characterState.walkAmplitude;
-            }
-            
-            // Arm animation
-            if (this.leftArm && this.rightArm) {
-                this.leftArm.rotation.z = -Math.sin(this.characterState.walkTime) * this.characterState.walkAmplitude;
-                this.rightArm.rotation.z = Math.sin(this.characterState.walkTime) * this.characterState.walkAmplitude;
-            }
-        } else {
-            // Reset to neutral position when not moving
-            if (this.leftLeg && this.rightLeg) {
-                this.leftLeg.rotation.x = 0;
-                this.rightLeg.rotation.x = 0;
-            }
-            if (this.leftArm && this.rightArm) {
-                this.leftArm.rotation.z = 0;
-                this.rightArm.rotation.z = 0;
-            }
+        // Normalize movement vector
+        if (moveDirection.length() > 0) {
+            moveDirection.normalize();
         }
 
-        // Jumping
-        if (keys['ShiftLeft'] && !this.characterState.isJumping) {
-            this.characterState.velocity.y = 8;
-            this.characterState.isJumping = true;
-            this.characterState.jumpVelocity = 8;
+        // Apply movement speed
+        const moveVelocity = moveDirection.multiplyScalar(this.characterState.moveSpeed);
+        const currentVelocityX = this.characterState.velocity.x;
+        const currentVelocityZ = this.characterState.velocity.z;
+
+        // Smoothly interpolate horizontal velocity towards target velocity
+        this.characterState.velocity.x = THREE.MathUtils.lerp(currentVelocityX, moveVelocity.x, 0.1);
+        this.characterState.velocity.z = THREE.MathUtils.lerp(currentVelocityZ, moveVelocity.z, 0.1);
+
+        // Jumping logic
+        if (keys['ShiftLeft'] || keys['ShiftRight'] || keys['Space']) {
+            if (!this.characterState.isJumping) {
+                this.characterState.isJumping = true;
+                this.characterState.jumpVelocity = this.characterState.jumpForce;
+            }
         }
 
         // Apply gravity
         if (this.characterState.isJumping) {
-            this.characterState.velocity.y -= 20 * deltaTime;
-            this.characterState.jumpVelocity -= 20 * deltaTime;
+            this.characterState.jumpVelocity += this.characterState.gravity * deltaTime;
+            this.characterState.velocity.y = this.characterState.jumpVelocity;
+        } else {
+            // Apply a small downward force when on ground to ensure contact
+            this.characterState.velocity.y = -1;
         }
 
-        // Update position
-        this.characterState.x += this.characterState.velocity.x * deltaTime;
-        this.characterState.y += this.characterState.velocity.y * deltaTime;
-        this.characterState.z += this.characterState.velocity.z * deltaTime;
+        // --- Collision Detection and Resolution --- 
+        const currentPosition = this.characterGroup.position.clone();
+        let proposedPosition = currentPosition.clone().add(this.characterState.velocity.clone().multiplyScalar(deltaTime));
+        
+        const characterAABB = this.getAABB().translate(proposedPosition.clone().sub(currentPosition));
+        let collisionOccurred = false;
+        let verticalCollision = false;
 
-        // Ground collision
-        if (this.characterState.y < this.characterState.baseY) {
-            this.characterState.y = this.characterState.baseY;
+        obstacles.forEach(obstacle => {
+             if (characterAABB.intersectsBox(obstacle.aabb)) {
+                 collisionOccurred = true;
+                 // Simple resolution: Stop movement in the collided direction
+                 // More sophisticated resolution would be needed for sliding etc.
+                 
+                 // Check Y collision first
+                 const tempAABB_Y = this.getAABB().translate(new THREE.Vector3(0, proposedPosition.y - currentPosition.y, 0));
+                 if (tempAABB_Y.intersectsBox(obstacle.aabb)) {
+                      verticalCollision = true;
+                      // If moving down and collided
+                      if (this.characterState.velocity.y <= 0) {
+                           // Landed on something
+                           this.characterState.isJumping = false;
+                           this.characterState.jumpVelocity = 0;
+                           this.characterState.velocity.y = 0;
+                           // Adjust Y position to be just above the obstacle
+                           proposedPosition.y = obstacle.aabb.max.y + (currentPosition.y - this.getAABB().min.y);
+                           // Update baseY when landing on a new surface
+                           this.characterState.baseY = proposedPosition.y;
+                      } else {
+                           // Hit head while moving up
+                           this.characterState.jumpVelocity = 0;
+                           this.characterState.velocity.y = 0;
+                            // Adjust Y position to be just below the obstacle
+                           proposedPosition.y = obstacle.aabb.min.y - (this.getAABB().max.y - currentPosition.y) - 0.01; 
+                      }
+                 }
+
+                 // Check X collision 
+                 const tempAABB_X = this.getAABB().translate(new THREE.Vector3(proposedPosition.x - currentPosition.x, 0, 0));
+                 if (!verticalCollision && tempAABB_X.intersectsBox(obstacle.aabb)) { 
+                     this.characterState.velocity.x = 0;
+                     // Adjust X position to be just outside the obstacle
+                     if (proposedPosition.x > currentPosition.x) { // Moving right
+                          proposedPosition.x = obstacle.aabb.min.x - (this.getAABB().max.x - currentPosition.x) - 0.01;
+                     } else { // Moving left
+                          proposedPosition.x = obstacle.aabb.max.x + (currentPosition.x - this.getAABB().min.x) + 0.01;
+                     }
+                 }
+                 
+                 // Check Z collision
+                 const tempAABB_Z = this.getAABB().translate(new THREE.Vector3(0, 0, proposedPosition.z - currentPosition.z));
+                  if (!verticalCollision && tempAABB_Z.intersectsBox(obstacle.aabb)) { 
+                     this.characterState.velocity.z = 0;
+                     // Adjust Z position to be just outside the obstacle
+                     if (proposedPosition.z > currentPosition.z) { // Moving forward (relative)
+                          proposedPosition.z = obstacle.aabb.min.z - (this.getAABB().max.z - currentPosition.z) - 0.01;
+                     } else { // Moving backward (relative)
+                          proposedPosition.z = obstacle.aabb.max.z + (currentPosition.z - this.getAABB().min.z) + 0.01;
+                     }
+                 }
+             }
+        });
+
+        // Apply the potentially adjusted proposed position
+        this.characterGroup.position.copy(proposedPosition);
+
+        // Prevent falling through floor (simple boundary check)
+        if (this.characterGroup.position.y < this.characterState.baseY && !this.characterState.isJumping && !verticalCollision) {
+            this.characterGroup.position.y = this.characterState.baseY;
             this.characterState.velocity.y = 0;
-            this.characterState.isJumping = false;
-            this.characterState.jumpVelocity = 0;
+        }
+        
+        // Keep character within pier boundaries (if needed, might be handled by obstacles)
+        // this.characterGroup.position.x = Math.max(-19.5, Math.min(19.5, this.characterGroup.position.x));
+        // this.characterGroup.position.z = Math.max(-9.5, Math.min(9.5, this.characterGroup.position.z));
+
+        // Update internal state position
+        this.characterState.x = this.characterGroup.position.x;
+        this.characterState.y = this.characterGroup.position.y;
+        this.characterState.z = this.characterGroup.position.z;
+
+        // --- Update Rotation --- 
+        if (isMoving) {
+            // Rotate character to face movement direction
+            this.characterState.rotation = Math.atan2(moveDirection.x, moveDirection.z);
+            this.characterGroup.rotation.y = this.characterState.rotation;
+        }
+        
+        // --- Update Animations --- 
+        this.characterState.isWalking = isMoving && !this.characterState.isJumping; // Set walking state
+        this.characterState.isIdle = !isMoving && !this.characterState.isJumping; // Set idle state
+
+        if (this.characterState.isWalking) {
+            this.characterState.walkTime += deltaTime * this.characterState.walkSpeed;
+            this.animateWalk(this.characterState.walkTime, this.characterState.walkAmplitude);
+        } else if (this.characterState.isIdle) {
+            this.characterState.idleAnimationTime += deltaTime * this.characterState.idleAnimationSpeed;
+            this.animateIdle(this.characterState.idleAnimationTime, this.characterState.shouldWaveArm);
+        } else { // Jumping or falling
+            this.setNeutralPose(); // Or a specific jump/fall pose
         }
 
-        // Update character group position
-        this.characterGroup.position.set(
-            this.characterState.x,
-            this.characterState.y,
-            this.characterState.z
-        );
-
-        // Handle vinyl shooting
-        if (keys['KeyE'] && Date.now() - this.lastShootTime > this.shootCooldown * 1000) {
+        // --- Handle Shooting --- 
+        const now = performance.now() / 1000; // Time in seconds
+        if (keys['KeyE'] && (now - this.lastShootTime > this.shootCooldown)) {
+            this.lastShootTime = now;
             this.shootVinyl();
-            this.lastShootTime = Date.now();
+            // ADDED: Send player message to chat system
+            if (this.chatSystem) { 
+                this.chatSystem.addPlayerMessage("Flinging a disc!");
+            } else {
+                console.warn("Character: chatSystem not available to send message.");
+            }
         }
 
-        // Update vinyls
+        // Update existing vinyls
         for (let i = this.vinyls.length - 1; i >= 0; i--) {
             const vinyl = this.vinyls[i];
             vinyl.update(deltaTime);
-            if (vinyl.isExpired()) {
+            if (!vinyl.isActive) {
                 this.scene.remove(vinyl.mesh);
                 this.vinyls.splice(i, 1);
             }
         }
-
-        // Update speech bubble if active
-        if (this.activeSpeechBubble) {
-            this.activeSpeechBubble.update(this.characterGroup.position);
+        
+        // --- Update Speech Bubble --- 
+        // ADDED: Update active speech bubble position
+        if (this.activeSpeechBubble && camera) {
+             // Position bubble above the character's head
+             const headPosition = this.characterGroup.position.clone();
+             headPosition.y += 1.8; // Adjust height offset as needed
+             this.activeSpeechBubble.update(headPosition, camera);
         }
     }
 
+    // --- Animation Methods --- 
+
+    animateWalk(walkTime, amplitude) {
+        if (this.leftArm && this.rightArm) {
+            const armAngle = Math.sin(walkTime) * amplitude * 0.7;
+            this.leftArm.rotation.x = -armAngle;
+            this.rightArm.rotation.x = armAngle;
+            this.leftArm.rotation.z = 0.15 + Math.sin(walkTime) * 0.1; // Side swing
+            this.rightArm.rotation.z = -0.15 - Math.sin(walkTime) * 0.1;
+        }
+        if (this.leftLeg && this.rightLeg) {
+            const legAngle = Math.sin(walkTime) * amplitude;
+            this.leftLeg.rotation.x = legAngle + 0.1;
+            this.rightLeg.rotation.x = -legAngle - 0.1;
+            // Subtle up/down motion for legs
+            this.leftLeg.position.y = -0.15 + Math.abs(Math.sin(walkTime)) * 0.05;
+            this.rightLeg.position.y = -0.15 + Math.abs(Math.sin(walkTime + Math.PI)) * 0.05;
+        }
+         if (this.leftShoe && this.rightShoe) {
+            const legAngle = Math.sin(walkTime) * amplitude;
+            this.leftShoe.rotation.x = legAngle + 0.1;
+            this.rightShoe.rotation.x = -legAngle - 0.1;
+            // Match shoe position y to leg position y
+            this.leftShoe.position.y = -0.7 + Math.abs(Math.sin(walkTime)) * 0.05;
+            this.rightShoe.position.y = -0.7 + Math.abs(Math.sin(walkTime + Math.PI)) * 0.05;
+            // Add z movement for shoes
+            this.leftShoe.position.z = 0.1 + Math.sin(walkTime) * 0.1;
+            this.rightShoe.position.z = 0.1 + Math.sin(walkTime + Math.PI) * 0.1;
+        }
+    }
+
+    animateIdle(idleTime, shouldWave) {
+         if (this.leftArm && this.rightArm) {
+             if (shouldWave) {
+                 // Wave animation for right arm (example)
+                 const waveAngle = Math.sin(idleTime * 2) * 0.8; // Faster, wider wave
+                 this.rightArm.rotation.z = -0.15 - waveAngle;
+                 this.rightArm.rotation.x = -0.5 + Math.sin(idleTime) * 0.3;
+                 // Keep left arm relatively still
+                 this.leftArm.rotation.x = Math.sin(idleTime * 0.5) * 0.05;
+                 this.leftArm.rotation.z = 0.15;
+             } else {
+                 // Subtle breathing/idle movement
+                 const idleAngle = Math.sin(idleTime * 0.5) * 0.05; 
+                 this.leftArm.rotation.x = idleAngle;
+                 this.rightArm.rotation.x = -idleAngle;
+                 this.leftArm.rotation.z = 0.15 + Math.sin(idleTime * 0.3) * 0.03; // Very subtle side sway
+                 this.rightArm.rotation.z = -0.15 - Math.sin(idleTime * 0.3) * 0.03;
+             }
+         }
+         // Keep legs relatively still during idle
+         if (this.leftLeg && this.rightLeg) {
+            this.leftLeg.rotation.x = 0.1;
+            this.rightLeg.rotation.x = -0.1;
+            this.leftLeg.position.y = -0.15;
+            this.rightLeg.position.y = -0.15;
+        }
+        if (this.leftShoe && this.rightShoe) {
+            this.leftShoe.rotation.x = 0.1;
+            this.rightShoe.rotation.x = -0.1;
+            this.leftShoe.position.y = -0.7;
+            this.rightShoe.position.y = -0.7;
+            this.leftShoe.position.z = 0.1;
+            this.rightShoe.position.z = 0.1;
+        }
+    }
+
+    setNeutralPose() {
+        // Reset arms and legs to a neutral position (e.g., slightly bent)
+        if (this.leftArm) this.leftArm.rotation.set(0, 0, 0.1);
+        if (this.rightArm) this.rightArm.rotation.set(0, 0, -0.1);
+        if (this.leftLeg) {
+             this.leftLeg.rotation.set(0.1, 0, 0);
+             this.leftLeg.position.y = -0.15;
+        }
+        if (this.rightLeg) {
+            this.rightLeg.rotation.set(-0.1, 0, 0);
+            this.rightLeg.position.y = -0.15;
+        }
+        if (this.leftShoe) {
+            this.leftShoe.rotation.set(0.1, 0, 0);
+            this.leftShoe.position.y = -0.7;
+            this.leftShoe.position.z = 0.1;
+        }
+         if (this.rightShoe) {
+            this.rightShoe.rotation.set(-0.1, 0, 0);
+            this.rightShoe.position.y = -0.7;
+            this.rightShoe.position.z = 0.1;
+        }
+    }
+
+    // --- Other Methods --- 
+
     shootVinyl() {
-        // Calculate spawn position from the right hand
-        const rightArmPosition = new THREE.Vector3(0.4, 0.7, 0);
-        rightArmPosition.applyMatrix4(this.characterGroup.matrix);
+        const direction = new THREE.Vector3();
+        this.characterGroup.getWorldDirection(direction);
         
-        const spawnOffset = new THREE.Vector3(0.3, 1.2, 0.5);
-        spawnOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.characterState.rotation);
-        
-        const spawnPosition = new THREE.Vector3(
-            this.characterGroup.position.x + spawnOffset.x,
-            this.characterGroup.position.y + spawnOffset.y,
-            this.characterGroup.position.z + spawnOffset.z
-        );
-        
-        // Calculate shooting direction based on character's rotation
-        const direction = new THREE.Vector3(
-            Math.sin(this.characterState.rotation),
-            0,
-            Math.cos(this.characterState.rotation)
-        );
-        
-        // Create new vinyl
+        // Spawn vinyl slightly in front of character
+        const spawnOffset = direction.clone().multiplyScalar(0.5);
+        const spawnPosition = this.characterGroup.position.clone().add(spawnOffset);
+        spawnPosition.y += 1.0; // Adjust vertical spawn height
+
         const vinyl = new Vinyl(this.scene, spawnPosition, direction);
         this.vinyls.push(vinyl);
+        
+        console.log("Shot vinyl!");
+        // Potentially add sound effect here
     }
 
     getPosition() {
-        return this.characterGroup.position;
+        return this.characterGroup.position.clone();
     }
-
+    
     say(message) {
-        // Remove existing speech bubble if there is one
+        // Remove existing speech bubble if any
         if (this.activeSpeechBubble) {
             this.activeSpeechBubble.remove();
         }
         
-        // Create new speech bubble
-        this.activeSpeechBubble = new SpeechBubble(this.scene, message);
+        // Create a new speech bubble
+        this.activeSpeechBubble = new SpeechBubble(message, this.scene);
+        // Initial position update will happen in the update loop
     }
 } 
