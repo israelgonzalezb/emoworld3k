@@ -7,6 +7,7 @@ import { Billboard } from './billboard.js';
 import { ChatSystem } from './chat.js';
 import { Portal } from './portal.js';
 import { createWaitingRoomScene } from './waitingRoom.js';
+import { TitleScreen } from './titleScreen.js';
 
 // Scene names and spawn points
 const MAIN_AREA_NAME = 'mainArea';
@@ -14,142 +15,35 @@ const WAITING_ROOM_NAME = 'waitingRoom';
 const mainAreaSpawnPoint = new THREE.Vector3(0, 3., -4)
 const waitingRoomSpawnPoint = new THREE.Vector3(0, 1.0, 0);
 
+// Game states
+const GAME_STATE = {
+    TITLE: 'title',
+    PLAYING: 'playing'
+};
+
 export class EBOYIsometricPierScene {
     constructor() {
         console.log("Starting IsometricPierScene initialization...");
         
         try {
-            // Scene setup
-            console.log("Creating main scene...");
-            this.mainScene = new THREE.Scene();
-            this.mainScene.background = new THREE.Color(0x000033);
+            // Initialize game state
+            this.gameState = GAME_STATE.TITLE;
             
-            // Add San Francisco fog with increased density
-            console.log("Setting up fog...");
-            this.mainScene.fog = new THREE.Fog(0x000033, 10, 50);
-            
-            // Create waiting room scene first
-            console.log("Creating waiting room scene...");
-            this.waitingRoomScene = createWaitingRoomScene(MAIN_AREA_NAME, mainAreaSpawnPoint);
-            
-            // Set current scene to main scene initially
-            console.log("Setting up scene management...");
-            this.currentScene = this.mainScene;
-            this.activePortals = this.mainScene.userData.portals || [];
-            
-            // Create portal to waiting room in main scene
-            console.log("Creating portal to waiting room...");
-            const portalToWaitingRoomPos = new THREE.Vector3(5, 2.5, -3);
-            const portalToWaitingRoom = new Portal(
-                this.mainScene,
-                portalToWaitingRoomPos,
-                1.5,
-                WAITING_ROOM_NAME,
-                waitingRoomSpawnPoint
-            );
-            this.mainScene.userData.portals = [portalToWaitingRoom];
-            this.activePortals = this.mainScene.userData.portals;
-            
-            // Create Matrix rain after both scenes are ready
-            console.log("Creating matrix rain...");
-            this.createMatrixRain();
-            
-            // Camera setup for isometric view
-            console.log("Setting up camera...");
-            const aspect = window.innerWidth / window.innerHeight;
-            this.camera = new THREE.OrthographicCamera(
-                -10 * aspect, 10 * aspect, 10, -10, 0.1, 1000
-            );
-            
-            // Set camera position for isometric view
-            this.camera.position.set(15, 15, 15);
-            this.camera.lookAt(0, 0, 0);
-            
-            // Renderer setup
-            console.log("Setting up renderer...");
-            this.renderer = new THREE.WebGLRenderer({ antialias: true });
-            this.renderer.setSize(window.innerWidth, window.innerHeight);
-            this.renderer.setPixelRatio(window.devicePixelRatio);
-            this.renderer.shadowMap.enabled = true;
-            
+            // Get container
             const container = document.getElementById('scene-container');
             if (!container) {
                 throw new Error('Scene container not found!');
             }
-            container.appendChild(this.renderer.domElement);
+
+            // Create title screen first
+            console.log("Creating title screen...");
+            this.titleScreen = new TitleScreen(container);
             
-            // Basic lighting
-            console.log("Setting up lighting...");
-            this.setupLighting();
-
-            // Add Axes Helper for debugging
-            const axesHelper = new THREE.AxesHelper(5); // Size of the axes
-            axesHelper.material.depthTest = false; // Render on top
-            axesHelper.material.depthWrite = false; // Don't write to depth buffer
-            this.mainScene.add(axesHelper);
-
-            // Create scene elements
-            console.log("Creating pier...");
-            this.pier = new Pier(this.mainScene);
-
-            // Create player character FIRST
-            console.log("Creating player character...");
-            // Pass a temporary placeholder for chatSystem initially
-            this.character = new Character(this.mainScene, null, 'Player'); 
-            // ADDED: Explicitly set initial position and state
-            this.character.characterGroup.position.copy(mainAreaSpawnPoint);
-            this.character.characterState.x = mainAreaSpawnPoint.x;
-            this.character.characterState.y = mainAreaSpawnPoint.y;
-            this.character.characterState.z = mainAreaSpawnPoint.z;
-            this.character.characterState.baseY = mainAreaSpawnPoint.y;
+            // Add event listeners for menu interaction
+            this.setupMenuInteraction();
             
-            // Initialize chat system and pass the player character
-            console.log("Initializing chat system...");
-            this.chatSystem = new ChatSystem(this.character);
-
-            // Now, assign the created chatSystem to the player character
-            this.character.chatSystem = this.chatSystem;
-
-            console.log("Creating decorative elements...");
-            this.decorativeElements = new DecorativeElements(this.mainScene);
-
-            console.log("Creating billboard...");
-            this.billboard = new Billboard(this.mainScene);
-
-            // Create NPCs
-            console.log("Creating NPCs...");
-            this.npcs = [];
-            for (let i = 0; i < 10; i++) {
-                const position = new THREE.Vector3(
-                    (Math.random() - 0.5) * 38,
-                    0.9,
-                    (Math.random() - 0.5) * 18
-                );
-                // Pass chatSystem to NPC
-                this.npcs.push(new NPC(this.mainScene, position, this.chatSystem, `NPC-${i + 1}`));
-            }
-            
-            // Input handling
-            console.log("Setting up input handling...");
-            this.keys = {};
-            window.addEventListener('keydown', (e) => this.onKeyDown(e));
-            window.addEventListener('keyup', (e) => this.onKeyUp(e));
-            
-            // Handle window resize
-            window.addEventListener('resize', () => this.onWindowResize());
-            
-            // Clock for frame-rate independent movement
-            this.clock = new THREE.Clock();
-            
-            // Array to hold bounding box visual helpers
-            this.boundingBoxHelpers = [];
-
-            // Add the welcome message via the chat system
-            this.chatSystem.addSystemMessage("Welcome to the Cyberpunk Pier! Use Arrows to move, E to throw discs.");
-            
-            // Start animation loop
-            console.log("Starting animation loop...");
-            this.animate();
+            // Initialize main game components (but don't show them yet)
+            this.initializeMainGame();
             
             console.log("Isometric Pier Scene successfully initialized!");
         } catch (error) {
@@ -157,7 +51,134 @@ export class EBOYIsometricPierScene {
             throw error;
         }
     }
-    
+
+    setupMenuInteraction() {
+        window.addEventListener('keydown', (e) => {
+            if (this.gameState === GAME_STATE.TITLE) {
+                if (e.code === 'Enter') {
+                    this.startGame();
+                }
+            }
+        });
+    }
+
+    initializeMainGame() {
+        // Scene setup
+        this.mainScene = new THREE.Scene();
+        this.mainScene.background = new THREE.Color(0x000033);
+        
+        // Add San Francisco fog with increased density
+        this.mainScene.fog = new THREE.Fog(0x000033, 10, 50);
+        
+        // Create waiting room scene
+        this.waitingRoomScene = createWaitingRoomScene(MAIN_AREA_NAME, mainAreaSpawnPoint);
+        
+        // Set current scene to main scene initially
+        this.currentScene = this.mainScene;
+        this.activePortals = this.mainScene.userData.portals || [];
+        
+        // Create portal to waiting room in main scene
+        const portalToWaitingRoomPos = new THREE.Vector3(5, 2.5, -3);
+        const portalToWaitingRoom = new Portal(
+            this.mainScene,
+            portalToWaitingRoomPos,
+            1.5,
+            WAITING_ROOM_NAME,
+            waitingRoomSpawnPoint
+        );
+        this.mainScene.userData.portals = [portalToWaitingRoom];
+        this.activePortals = this.mainScene.userData.portals;
+        
+        // Create Matrix rain
+        this.createMatrixRain();
+        
+        // Camera setup for isometric view
+        const aspect = window.innerWidth / window.innerHeight;
+        this.camera = new THREE.OrthographicCamera(
+            -10 * aspect, 10 * aspect, 10, -10, 0.1, 1000
+        );
+        
+        // Set camera position for isometric view
+        this.camera.position.set(15, 15, 15);
+        this.camera.lookAt(0, 0, 0);
+        
+        // Renderer setup
+        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.shadowMap.enabled = true;
+        
+        // Basic lighting
+        this.setupLighting();
+
+        // Create scene elements
+        this.pier = new Pier(this.mainScene);
+
+        // Create player character
+        this.character = new Character(this.mainScene, null, 'Player');
+        this.character.characterGroup.position.copy(mainAreaSpawnPoint);
+        this.character.characterState.x = mainAreaSpawnPoint.x;
+        this.character.characterState.y = mainAreaSpawnPoint.y;
+        this.character.characterState.z = mainAreaSpawnPoint.z;
+        this.character.characterState.baseY = mainAreaSpawnPoint.y;
+        
+        // Initialize chat system
+        this.chatSystem = new ChatSystem(this.character);
+        this.character.chatSystem = this.chatSystem;
+
+        // Create decorative elements
+        this.decorativeElements = new DecorativeElements(this.mainScene);
+
+        // Create billboard
+        this.billboard = new Billboard(this.mainScene);
+
+        // Create NPCs
+        this.npcs = [];
+        for (let i = 0; i < 10; i++) {
+            const position = new THREE.Vector3(
+                (Math.random() - 0.5) * 38,
+                0.9,
+                (Math.random() - 0.5) * 18
+            );
+            this.npcs.push(new NPC(this.mainScene, position, this.chatSystem, `NPC-${i + 1}`));
+        }
+        
+        // Input handling
+        this.keys = {};
+        window.addEventListener('keydown', (e) => this.onKeyDown(e));
+        window.addEventListener('keyup', (e) => this.onKeyUp(e));
+        
+        // Handle window resize
+        window.addEventListener('resize', () => this.onWindowResize());
+        
+        // Clock for frame-rate independent movement
+        this.clock = new THREE.Clock();
+        
+        // Array to hold bounding box visual helpers
+        this.boundingBoxHelpers = [];
+    }
+
+    startGame() {
+        // Remove title screen
+        if (this.titleScreen) {
+            this.titleScreen.renderer.domElement.remove();
+            this.titleScreen = null;
+        }
+
+        // Add main game renderer to container
+        const container = document.getElementById('scene-container');
+        container.appendChild(this.renderer.domElement);
+
+        // Change game state
+        this.gameState = GAME_STATE.PLAYING;
+
+        // Add welcome message
+        this.chatSystem.addSystemMessage("Welcome to the Cyberpunk Pier! Use Arrows to move, E to throw discs.");
+
+        // Start animation loop
+        this.animate();
+    }
+
     setupLighting() {
         // Ambient light
         const ambientLight = new THREE.AmbientLight(0x333333, 0.5);
