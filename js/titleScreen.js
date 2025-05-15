@@ -86,20 +86,22 @@ export class TitleScreen {
 
         // Handle window resize
         window.addEventListener('resize', () => this.onWindowResize());
+
+        // Add fog for depth
+        this.scene.fog = new THREE.FogExp2(0x101020, 0.035);
     }
 
     setupPostProcessing() {
         this.composer = new EffectComposer(this.renderer);
-        
         // Add render pass
         const renderPass = new RenderPass(this.scene, this.camera);
         this.composer.addPass(renderPass);
 
-        // Add bloom effect for neon glow
+        // Add bloom effect for neon glow (reduced intensity)
         const bloomPass = new UnrealBloomPass(
             new THREE.Vector2(window.innerWidth, window.innerHeight),
-            1.5,  // strength
-            0.4,  // radius
+            0.7,  // strength reduced from 1.5
+            0.3,  // radius
             0.85  // threshold
         );
         this.composer.addPass(bloomPass);
@@ -156,7 +158,7 @@ export class TitleScreen {
         // Create multiple buildings
         for (let i = 0; i < 20; i++) {
             const height = 5 + Math.random() * 15;
-            const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
+            const building = new THREE.Mesh(buildingGeometry, buildingMaterial.clone());
             building.scale.set(2 + Math.random() * 3, height, 2 + Math.random() * 3);
             building.position.set(
                 (Math.random() - 0.5) * 50,
@@ -168,6 +170,11 @@ export class TitleScreen {
             // Add neon lights to some buildings
             if (Math.random() > 0.5) {
                 this.addNeonLight(building);
+            }
+
+            // Add neon accent lines to some buildings
+            if (Math.random() > 0.5) {
+                this.addNeonAccent(building);
             }
         }
     }
@@ -196,6 +203,29 @@ export class TitleScreen {
         const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
         sphere.position.copy(light.position);
         this.scene.add(sphere);
+    }
+
+    addNeonAccent(building) {
+        // Add glowing neon lines to the building
+        const neonColors = [0xff00ff, 0x00ffff, 0x00ff99, 0xffff00, 0x00ffea];
+        const color = neonColors[Math.floor(Math.random() * neonColors.length)];
+        const neonMaterial = new THREE.MeshBasicMaterial({ color, emissive: color });
+        const accentCount = 1 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < accentCount; i++) {
+            const accentHeight = building.scale.y * (0.2 + 0.6 * Math.random());
+            const accentGeometry = new THREE.BoxGeometry(
+                building.scale.x * (0.8 + 0.2 * Math.random()),
+                0.1,
+                0.1
+            );
+            const accent = new THREE.Mesh(accentGeometry, neonMaterial);
+            accent.position.set(
+                building.position.x,
+                building.position.y - building.scale.y / 2 + accentHeight,
+                building.position.z + building.scale.z / 2 + 0.1
+            );
+            this.scene.add(accent);
+        }
     }
 
     createRain() {
@@ -337,6 +367,12 @@ export class TitleScreen {
 
     animate() {
         requestAnimationFrame(() => this.animate());
+
+        // Camera slow pan
+        const t = Date.now() * 0.0002;
+        this.camera.position.x = Math.sin(t) * 2;
+        this.camera.position.z = 10 + Math.cos(t) * 2;
+        this.camera.lookAt(0, 0, 0);
 
         // Update rain
         this.rainParticles.forEach(particle => {
