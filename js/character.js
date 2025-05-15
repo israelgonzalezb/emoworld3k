@@ -339,12 +339,9 @@ export class Character {
         if (!this._aabb) {
             this._aabb = new THREE.Box3();
         }
-        // Slightly adjust AABB if needed for better collision detection
-        const size = new THREE.Vector3();
-        const center = new THREE.Vector3();
-        this.characterGroup.children[0].geometry.computeBoundingBox(); // Assuming body is first child
-        this._aabb.copy(this.characterGroup.children[0].geometry.boundingBox).applyMatrix4(this.characterGroup.matrixWorld);
-        
+        // Calculate AABB from the entire character group for better accuracy
+        this._aabb.setFromObject(this.characterGroup, true); // Use precise option
+
         // Optional: Expand the box slightly for safety margin
         // this._aabb.expandByScalar(0.1);
         return this._aabb;
@@ -428,17 +425,46 @@ export class Character {
         // Use the current velocity (set by player input or NPC logic)
         let proposedPosition = currentPosition.clone().add(this.characterState.velocity.clone().multiplyScalar(deltaTime)); 
         
-        const characterAABB = this.getAABB().translate(proposedPosition.clone().sub(currentPosition));
         let collisionOccurred = false;
         let verticalCollision = false;
         let landedThisFrame = false;
 
+        // Define character collision dimensions
+        const characterHeight = 1.8; // Approximate height
+        const characterWidth = 0.6; // Approximate width/depth
+
         obstacles.forEach(obstacle => {
-             if (characterAABB.intersectsBox(obstacle.aabb)) {
+             // Get the character's base AABB for size reference if needed later, but don't use it directly for the check AABB
+             // const baseCharacterAABB = this.getAABB(); 
+
+             // --- Calculate AABB from Bottom-Center and Size --- 
+             // Align bottom of collision box with proposed foot position
+             const checkCenterX = proposedPosition.x;
+             const checkCenterZ = proposedPosition.z;
+             const collisionMin = new THREE.Vector3(checkCenterX - characterWidth / 2, proposedPosition.y, checkCenterZ - characterWidth / 2);
+             const collisionMax = new THREE.Vector3(checkCenterX + characterWidth / 2, proposedPosition.y + characterHeight, checkCenterZ + characterWidth / 2);
+             const collisionCheckAABB = new THREE.Box3(collisionMin, collisionMax);
+             // --- End AABB Calculation --- 
+
+             // --- DEBUG: Check AABB values for ALL obstacles ---
+            // console.log(`Checking collision with ${obstacle.object.name || obstacle.object.type} at Pos: ${obstacle.object.position.x.toFixed(1)},${obstacle.object.position.y.toFixed(1)},${obstacle.object.position.z.toFixed(1)}`);
+            // console.log(`  Character AABB: ${collisionCheckAABB.min.x.toFixed(2)}, ${collisionCheckAABB.min.y.toFixed(2)}, ${collisionCheckAABB.min.z.toFixed(2)} -> ${collisionCheckAABB.max.x.toFixed(2)}, ${collisionCheckAABB.max.y.toFixed(2)}, ${collisionCheckAABB.max.z.toFixed(2)}`);
+            // console.log(`  Obstacle AABB: ${obstacle.aabb.min.x.toFixed(2)}, ${obstacle.aabb.min.y.toFixed(2)}, ${obstacle.aabb.min.z.toFixed(2)} -> ${obstacle.aabb.max.x.toFixed(2)}, ${obstacle.aabb.max.y.toFixed(2)}, ${obstacle.aabb.max.z.toFixed(2)}`);
+            // const intersects = collisionCheckAABB.intersectsBox(obstacle.aabb);
+            // console.log(`  Intersection: ${intersects}`);
+             // --- END DEBUG ---
+
+             if (collisionCheckAABB.intersectsBox(obstacle.aabb)) {
                  collisionOccurred = true;
-                 
+                 const obstacleName = obstacle.object.name || obstacle.object.type;
+                 console.log(`COLLISION DETECTED with ${obstacleName}`); // Log collision
+                 console.log(`  Before Resolve - Proposed Pos: ${proposedPosition.x.toFixed(2)}, ${proposedPosition.y.toFixed(2)}, ${proposedPosition.z.toFixed(2)}`);
+
                  // Resolve Y collision first
-                 const tempAABB_Y = this.getAABB().translate(new THREE.Vector3(0, proposedPosition.y - currentPosition.y, 0));
+                 // Recalculate AABB based on Y-only movement for Y check
+                 const yCheckCenter = currentPosition.clone();
+                 yCheckCenter.y = proposedPosition.y + (characterHeight / 2);
+                 const tempAABB_Y = new THREE.Box3().setFromCenterAndSize(yCheckCenter, new THREE.Vector3(characterWidth, characterHeight, characterWidth));
                  if (tempAABB_Y.intersectsBox(obstacle.aabb)) {
                       verticalCollision = true;
                       if (this.characterState.velocity.y <= 0) { // Moving down
@@ -446,38 +472,51 @@ export class Character {
                            this.characterState.isJumping = false;
                            this.characterState.jumpVelocity = 0;
                            this.characterState.velocity.y = 0;
-                           proposedPosition.y = obstacle.aabb.max.y + (currentPosition.y - this.getAABB().min.y);
+                           // Reset position based on the simplified collision box bottom
+                           proposedPosition.y = obstacle.aabb.max.y; // Foot level at top of obstacle
                            this.characterState.baseY = proposedPosition.y;
                       } else { // Moving up (Hit head)
                            this.characterState.jumpVelocity = 0;
                            this.characterState.velocity.y = 0;
-                           proposedPosition.y = obstacle.aabb.min.y - (this.getAABB().max.y - currentPosition.y) - 0.01;
+                           // Reset position based on the simplified collision box top
+                           proposedPosition.y = obstacle.aabb.min.y - characterHeight - 0.01; // Head below obstacle bottom
                       }
                  }
 
+                 // Get character AABB size for resolution (use defined width)
+                 const characterSize = new THREE.Vector3(characterWidth, characterHeight, characterWidth);
+                 // const characterSize = baseCharacterAABB.getSize(new THREE.Vector3());
+
                  // Resolve X collision if no vertical collision resolved movement
-                 const tempAABB_X = this.getAABB().translate(new THREE.Vector3(proposedPosition.x - currentPosition.x, 0, 0));
-                 // Check intersection *only if Y didn't cause a landing this frame*
-                 // Or, allow X/Z resolution even if landed? Let's allow it for now.
-                 if (tempAABB_X.intersectsBox(obstacle.aabb)) { 
+                 // Recalculate AABB based on X-only movement
+                 const xCheckCenter = currentPosition.clone();
+                 xCheckCenter.x = proposedPosition.x;
+                 xCheckCenter.y += characterHeight / 2; 
+                 const tempAABB_X = new THREE.Box3().setFromCenterAndSize(xCheckCenter, characterSize);
+                 if (tempAABB_X.intersectsBox(obstacle.aabb)) {
                      this.characterState.velocity.x = 0;
-                     if (proposedPosition.x > currentPosition.x) { // Moving right
-                          proposedPosition.x = obstacle.aabb.min.x - (this.getAABB().max.x - currentPosition.x) - 0.01;
-                     } else { // Moving left
-                          proposedPosition.x = obstacle.aabb.max.x + (currentPosition.x - this.getAABB().min.x) + 0.01;
+                     if (proposedPosition.x > currentPosition.x) { // Moving right (+X)
+                          proposedPosition.x = obstacle.aabb.min.x - (characterSize.x / 2) - 0.01;
+                     } else { // Moving left (-X)
+                          proposedPosition.x = obstacle.aabb.max.x + (characterSize.x / 2) + 0.01;
                      }
                  }
-                 
+
                  // Resolve Z collision if no vertical collision resolved movement
-                 const tempAABB_Z = this.getAABB().translate(new THREE.Vector3(0, 0, proposedPosition.z - currentPosition.z));
-                 if (tempAABB_Z.intersectsBox(obstacle.aabb)) { 
+                 // Recalculate AABB based on Z-only movement
+                 const zCheckCenter = currentPosition.clone();
+                 zCheckCenter.z = proposedPosition.z;
+                 zCheckCenter.y += characterHeight / 2; 
+                 const tempAABB_Z = new THREE.Box3().setFromCenterAndSize(zCheckCenter, characterSize);
+                 if (tempAABB_Z.intersectsBox(obstacle.aabb)) {
                      this.characterState.velocity.z = 0;
-                     if (proposedPosition.z > currentPosition.z) { // Moving forward (relative)
-                          proposedPosition.z = obstacle.aabb.min.z - (this.getAABB().max.z - currentPosition.z) - 0.01;
-                     } else { // Moving backward (relative)
-                          proposedPosition.z = obstacle.aabb.max.z + (currentPosition.z - this.getAABB().min.z) + 0.01;
+                     if (proposedPosition.z > currentPosition.z) { // Moving forward (+Z)
+                          proposedPosition.z = obstacle.aabb.min.z - (characterSize.z / 2) - 0.01;
+                     } else { // Moving backward (-Z)
+                          proposedPosition.z = obstacle.aabb.max.z + (characterSize.z / 2) + 0.01;
                      }
                  }
+                 console.log(`  After Resolve - Proposed Pos: ${proposedPosition.x.toFixed(2)}, ${proposedPosition.y.toFixed(2)}, ${proposedPosition.z.toFixed(2)}`); // Log resolved position
              }
         });
 

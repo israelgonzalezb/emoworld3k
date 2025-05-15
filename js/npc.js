@@ -62,7 +62,7 @@ export class NPC extends Character {
             "My circuits are buzzing.",
             "The future is bright... and rainy.",
             "Synthwave and solitude.",
-            "Just contemplating the digital sea.",
+            "Just thinking about the digital sea.",
             "Is this real life?",
             "Lost in the code.",
             "These colors... wow.",

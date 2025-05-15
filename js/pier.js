@@ -43,6 +43,7 @@ export class Pier {
         const pierPlatform = new THREE.Mesh(pierGeometry, pierMaterial);
         pierPlatform.position.y = 0;
         pierPlatform.renderOrder = 1;
+        pierPlatform.userData.isCollidable = true;
         this.pierGroup.add(pierPlatform);
         
         // Create pier supports
@@ -83,18 +84,22 @@ export class Pier {
         const topRailingGeometry = createBoxGeometry(40, 0.1, 0.1);
         const frontTopRailing = new THREE.Mesh(topRailingGeometry, railingMaterial);
         frontTopRailing.position.set(0, 1.25, 10);
+        frontTopRailing.userData.isCollidable = true;
         this.pierGroup.add(frontTopRailing);
         
         const backTopRailing = new THREE.Mesh(topRailingGeometry, railingMaterial);
         backTopRailing.position.set(0, 1.25, -10);
+        backTopRailing.userData.isCollidable = true;
         this.pierGroup.add(backTopRailing);
         
         const leftTopRailing = new THREE.Mesh(createBoxGeometry(0.1, 0.1, 20), railingMaterial);
         leftTopRailing.position.set(-20, 1.25, 0);
+        leftTopRailing.userData.isCollidable = true;
         this.pierGroup.add(leftTopRailing);
         
         const rightTopRailing = new THREE.Mesh(createBoxGeometry(0.1, 0.1, 20), railingMaterial);
         rightTopRailing.position.set(20, 1.25, 0);
+        rightTopRailing.userData.isCollidable = true;
         this.pierGroup.add(rightTopRailing);
         
         // Vertical posts
@@ -114,6 +119,7 @@ export class Pier {
         postPositions.forEach(pos => {
             const post = new THREE.Mesh(postGeometry, railingMaterial);
             post.position.set(pos[0], pos[1], pos[2]);
+            post.userData.isCollidable = true;
             this.pierGroup.add(post);
         });
     }

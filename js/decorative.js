@@ -63,6 +63,7 @@ export class DecorativeElements {
             bench.add(rightLeg);
             
             bench.position.set(pos[0], pos[1], pos[2]);
+            bench.userData.isCollidable = true;
             this.decorativeGroup.add(bench);
         });
     }

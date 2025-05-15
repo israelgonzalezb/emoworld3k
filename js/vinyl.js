@@ -6,6 +6,13 @@ export class Vinyl {
         this.speed = 15;
         this.lifespan = 2; // Seconds before disappearing
         this.timeAlive = 0;
+        this.isActive = true;
+        this.gravity = 9.8; // Gravity constant
+        this.velocity = new THREE.Vector3(
+            direction.x * this.speed,
+            0,
+            direction.z * this.speed
+        );
         
         // Create vinyl geometry
         const vinylGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.02, 32);
@@ -19,7 +26,7 @@ export class Vinyl {
         });
         
         // Create the vinyl mesh
-        this.vinyl = new THREE.Mesh(vinylGeometry, vinylMaterial);
+        this.mesh = new THREE.Mesh(vinylGeometry, vinylMaterial);
         
         // Add grooves (rings) to the vinyl
         const grooveCount = 8;
@@ -33,12 +40,12 @@ export class Vinyl {
             const groove = new THREE.Mesh(grooveGeometry, grooveMaterial);
             groove.rotation.x = Math.PI / 2;
             groove.position.y = 0.011; // Slightly above the vinyl surface
-            this.vinyl.add(groove);
+            this.mesh.add(groove);
             
             // Add groove to bottom side
             const bottomGroove = groove.clone();
             bottomGroove.position.y = -0.011;
-            this.vinyl.add(bottomGroove);
+            this.mesh.add(bottomGroove);
         }
         
         // Add center hole
@@ -50,49 +57,89 @@ export class Vinyl {
         const hole = new THREE.Mesh(holeGeometry, holeMaterial);
         hole.rotation.x = Math.PI / 2;
         hole.position.y = 0.011;
-        this.vinyl.add(hole);
+        this.mesh.add(hole);
         
         // Add hole to bottom side
         const bottomHole = hole.clone();
         bottomHole.position.y = -0.011;
-        this.vinyl.add(bottomHole);
+        this.mesh.add(bottomHole);
         
         // Position and rotate the vinyl
-        this.vinyl.position.copy(position);
-        this.vinyl.rotation.x = Math.PI / 2; // Make it vertical
-        
-        // Store normalized direction for movement
-        this.direction = direction.normalize();
+        this.mesh.position.copy(position);
+        this.mesh.rotation.x = Math.PI / 2; // Make it vertical
         
         // Add to scene
-        this.scene.add(this.vinyl);
+        this.scene.add(this.mesh);
     }
     
     update(deltaTime) {
-        // Update position
-        this.vinyl.position.x += this.direction.x * this.speed * deltaTime;
-        this.vinyl.position.z += this.direction.z * this.speed * deltaTime;
+        if (!this.isActive) return false;
+
+        // Apply gravity to velocity
+        this.velocity.y -= this.gravity * deltaTime;
+        
+        // Update position based on velocity
+        this.mesh.position.x += this.velocity.x * deltaTime;
+        this.mesh.position.y += this.velocity.y * deltaTime;
+        this.mesh.position.z += this.velocity.z * deltaTime;
         
         // Rotate the vinyl
-        this.vinyl.rotation.y += 15 * deltaTime; // Spin animation
+        this.mesh.rotation.y += 15 * deltaTime; // Spin animation
+        
+        // Check if vinyl hit the ground
+        if (this.mesh.position.y <= 0) {
+            this.mesh.position.y = 0;
+            this.velocity.y = 0;
+            this.velocity.x *= 0.8; // Friction
+            this.velocity.z *= 0.8; // Friction
+        }
         
         // Update lifespan
         this.timeAlive += deltaTime;
         
         // Check if vinyl should be removed
         if (this.timeAlive >= this.lifespan) {
-            this.remove();
+            this.dispose();
             return false;
         }
         
         return true;
     }
     
-    remove() {
-        this.scene.remove(this.vinyl);
+    dispose() {
+        if (this.mesh) {
+            // Remove all child meshes and dispose their geometries and materials
+            while(this.mesh.children.length > 0) {
+                const child = this.mesh.children[0];
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(material => material.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+                this.mesh.remove(child);
+            }
+            
+            // Dispose the main mesh's geometry and material
+            if (this.mesh.geometry) this.mesh.geometry.dispose();
+            if (this.mesh.material) {
+                if (Array.isArray(this.mesh.material)) {
+                    this.mesh.material.forEach(material => material.dispose());
+                } else {
+                    this.mesh.material.dispose();
+                }
+            }
+            
+            // Remove from scene
+            this.scene.remove(this.mesh);
+            this.mesh = null;
+        }
+        this.isActive = false;
     }
     
     getPosition() {
-        return this.vinyl.position;
+        return this.mesh ? this.mesh.position : new THREE.Vector3();
     }
 } 

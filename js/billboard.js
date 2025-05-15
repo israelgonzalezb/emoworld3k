@@ -23,6 +23,7 @@ export class Billboard {
         this.billboardGroup = new THREE.Group();
         this.billboardGroup.add(this.frame);
         this.billboardGroup.add(this.screen);
+        this.billboardGroup.userData.isCollidable = true;
         
         // Position and rotate the billboard
         this.billboardGroup.position.set(0, 3, 8); // 8 units forward from the edge

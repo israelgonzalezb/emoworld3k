@@ -11,7 +11,7 @@ import { createWaitingRoomScene } from './waitingRoom.js';
 // Scene names and spawn points
 const MAIN_AREA_NAME = 'mainArea';
 const WAITING_ROOM_NAME = 'waitingRoom';
-const mainAreaSpawnPoint = new THREE.Vector3(0, 2., -4)
+const mainAreaSpawnPoint = new THREE.Vector3(0, 3., -4)
 const waitingRoomSpawnPoint = new THREE.Vector3(0, 1.0, 0);
 
 export class EBOYIsometricPierScene {
@@ -82,6 +82,12 @@ export class EBOYIsometricPierScene {
             console.log("Setting up lighting...");
             this.setupLighting();
 
+            // Add Axes Helper for debugging
+            const axesHelper = new THREE.AxesHelper(5); // Size of the axes
+            axesHelper.material.depthTest = false; // Render on top
+            axesHelper.material.depthWrite = false; // Don't write to depth buffer
+            this.mainScene.add(axesHelper);
+
             // Create scene elements
             console.log("Creating pier...");
             this.pier = new Pier(this.mainScene);
@@ -135,6 +141,9 @@ export class EBOYIsometricPierScene {
             // Clock for frame-rate independent movement
             this.clock = new THREE.Clock();
             
+            // Array to hold bounding box visual helpers
+            this.boundingBoxHelpers = [];
+
             // Add the welcome message via the chat system
             this.chatSystem.addSystemMessage("Welcome to the Cyberpunk Pier! Use Arrows to move, E to throw discs.");
             
@@ -220,7 +229,7 @@ export class EBOYIsometricPierScene {
     
     createMatrixRain() {
         // Create particle system
-        const particleCount = 1000;
+        const particleCount = 5000;
         const positions = new Float32Array(particleCount * 3);
         const velocities = new Float32Array(particleCount * 3);
         
@@ -246,7 +255,7 @@ export class EBOYIsometricPierScene {
         // Create material with Matrix-style green color
         const material = new THREE.PointsMaterial({
             color: 0x00ff00,
-            size: 0.1,
+            size: 0.5,
             transparent: true,
             opacity: 0.6,
             sizeAttenuation: true
@@ -258,8 +267,8 @@ export class EBOYIsometricPierScene {
         // Add rain to both scenes - ensure this doesn't create DOM elements
         this.mainScene.add(this.rain);
         // Clone the rain rather than create a new instance to ensure we don't get extra DOM elements
-        const rainClone = this.rain.clone();
-        this.waitingRoomScene.add(rainClone);
+        // const rainClone = this.rain.clone();
+        // this.waitingRoomScene.add(rainClone);
         
         // Store velocities for animation
         this.rainVelocities = velocities;
@@ -338,67 +347,141 @@ export class EBOYIsometricPierScene {
         
         const deltaTime = this.clock.getDelta();
 
-        // --- Prepare Obstacles for Collision --- 
+        // --- Clear previous BBox Helpers ---
+        this.boundingBoxHelpers.forEach(helper => this.currentScene.remove(helper));
+        this.boundingBoxHelpers = [];
+
+        // --- Prepare Obstacles for Collision ---
         const obstacles = [];
         const tempBox = new THREE.Box3(); // Reuse Box3 object for efficiency
 
-        // Add pier elements (assuming pier object has meshes/groups)
-        // Example: Check if pier.pierGroup exists and is a group
+        // Function to add an object's AABB if it's marked as collidable
+        const addCollidableObstacle = (object) => {
+            // Check if the object itself is marked
+            if (object.userData.isCollidable) {
+                tempBox.setFromObject(object, true); // Use precise bounding box
+                // --- DEBUG: Log AABB for benches ---
+                // Heuristic: Assume benches are Groups marked as collidable
+                if (object.isGroup) { 
+                    console.log(`Calculated AABB for collidable Group (${object.name || ''}): `,
+                                `Min: ${tempBox.min.x.toFixed(2)}, ${tempBox.min.y.toFixed(2)}, ${tempBox.min.z.toFixed(2)}`, 
+                                `Max: ${tempBox.max.x.toFixed(2)}, ${tempBox.max.y.toFixed(2)}, ${tempBox.max.z.toFixed(2)}`);
+                }
+                // --- END DEBUG ---
+                // Ensure the box is valid (has volume)
+                if (!tempBox.isEmpty()) {
+                     const obstacleData = { aabb: tempBox.clone(), object: object };
+                     obstacles.push(obstacleData);
+                     // Add BBox helper
+                     const helper = new THREE.Box3Helper(obstacleData.aabb, 0xffff00); // Yellow
+                     this.currentScene.add(helper);
+                     this.boundingBoxHelpers.push(helper);
+                }
+            }
+            // Traverse children only if the object is *not* collidable itself
+            // (avoids adding parts of an already added object)
+            else if (object.children && object.children.length > 0) {
+                 object.traverse((child) => {
+                     if (child !== object && child.userData.isCollidable) {
+                         // --- Log found collidable child ---
+                         console.log(`Found collidable child: Name='${child.name || 'N/A'}', Type='${child.type}', isGroup=${child.isGroup}`);
+                         // --- END Log ---
+                         
+                         const childBox = new THREE.Box3();
+                         
+                         if (child.isGroup) {
+                             // Manually compute AABB for Groups by encompassing children
+                             childBox.makeEmpty(); // Start with an empty box
+                             child.traverse((subChild) => {
+                                 if (subChild.isMesh) {
+                                     const subChildBox = new THREE.Box3().setFromObject(subChild, true);
+                                     if (!subChildBox.isEmpty()) {
+                                         childBox.expandByPoint(subChildBox.min);
+                                         childBox.expandByPoint(subChildBox.max);
+                                     }
+                                 }
+                             });
+                              // Log the manually calculated AABB for the group
+                              console.log(`Manually Calculated AABB for collidable Child Group (${child.name || 'Group'}): `,
+                                 `Min: ${childBox.min.x.toFixed(2)}, ${childBox.min.y.toFixed(2)}, ${childBox.min.z.toFixed(2)}`, 
+                                 `Max: ${childBox.max.x.toFixed(2)}, ${childBox.max.y.toFixed(2)}, ${childBox.max.z.toFixed(2)}`);
+
+                         } else {
+                             // For non-groups (like individual railing meshes), use setFromObject directly
+                             childBox.setFromObject(child, true);
+                         }
+                         // --- End Modified Handling ---
+
+                         if (!childBox.isEmpty()) {
+                             const obstacleData = { aabb: childBox.clone(), object: child };
+                             obstacles.push(obstacleData);
+                             // Add BBox helper
+                             const helper = new THREE.Box3Helper(obstacleData.aabb, 0xffff00); // Yellow
+                             this.currentScene.add(helper);
+                             this.boundingBoxHelpers.push(helper);
+                         }
+                     }
+                 });
+            }
+        };
+
+
+        // Add collidable elements from the main scene objects
         if (this.pier && this.pier.pierGroup) {
-            this.pier.pierGroup.traverse((child) => {
-                if (child.isMesh) {
-                    // We need a way to identify collidable parts vs non-collidable (like water)
-                    // For now, let's assume all pier meshes are collidable
-                    tempBox.setFromObject(child); 
-                    obstacles.push({ aabb: tempBox.clone(), object: child });
-                }
-            });
-        } else if (this.pier && this.pier.isMesh) { // If pier itself is a single mesh
-             tempBox.setFromObject(this.pier); 
-             obstacles.push({ aabb: tempBox.clone(), object: this.pier });
+            addCollidableObstacle(this.pier.pierGroup);
+        }
+        if (this.decorativeElements && this.decorativeElements.decorativeGroup) {
+            addCollidableObstacle(this.decorativeElements.decorativeGroup);
+        }
+        if (this.billboard && this.billboard.billboardGroup) {
+             addCollidableObstacle(this.billboard.billboardGroup);
+        } else if (this.billboard && this.billboard.mesh && this.billboard.mesh.userData.isCollidable) {
+             // Fallback for single mesh billboard if marked
+             tempBox.setFromObject(this.billboard.mesh, true);
+             if (!tempBox.isEmpty()) {
+                 const obstacleData = { aabb: tempBox.clone(), object: this.billboard.mesh };
+                 obstacles.push(obstacleData);
+                  // Add BBox helper
+                 const helper = new THREE.Box3Helper(obstacleData.aabb, 0xffff00); // Yellow
+                 this.currentScene.add(helper);
+                 this.boundingBoxHelpers.push(helper);
+             }
         }
 
-        // Add decorative elements (assuming they have meshes/groups)
-        // Example: Iterate through decorativeElements array or group
-        if (this.decorativeElements && this.decorativeElements.elementsGroup) {
-            this.decorativeElements.elementsGroup.traverse((child) => {
-                if (child.isMesh) { 
-                    // Add logic here if some decoratives are non-collidable
-                     tempBox.setFromObject(child);
-                     obstacles.push({ aabb: tempBox.clone(), object: child });
-                }
-            });
-        } 
-
-         // Add billboard (assuming billboard.mesh exists)
-         if (this.billboard && this.billboard.billboardGroup) { // Check for billboardGroup
-            tempBox.setFromObject(this.billboard.billboardGroup);
-            obstacles.push({ aabb: tempBox.clone(), object: this.billboard.billboardGroup });
-        } else if (this.billboard && this.billboard.mesh) { // Fallback to mesh if no group
-            tempBox.setFromObject(this.billboard.mesh);
-            obstacles.push({ aabb: tempBox.clone(), object: this.billboard.mesh });
-        }
-
-        // Add NPCs
+        // Add NPCs as obstacles (assuming the main group is collidable)
         this.npcs.forEach(npc => {
             if (npc.npcGroup) { // Assuming npc has an npcGroup
-                tempBox.setFromObject(npc.npcGroup);
-                obstacles.push({ aabb: tempBox.clone(), object: npc.npcGroup });
+                 // Consider if NPCs should *always* be obstacles or if they need marking too
+                 // For now, let's assume they are always obstacles
+                 tempBox.setFromObject(npc.npcGroup, true);
+                 if (!tempBox.isEmpty()) {
+                     const obstacleData = { aabb: tempBox.clone(), object: npc.npcGroup };
+                     obstacles.push(obstacleData);
+                      // Add BBox helper
+                     const helper = new THREE.Box3Helper(obstacleData.aabb, 0xffff00); // Yellow
+                     this.currentScene.add(helper);
+                     this.boundingBoxHelpers.push(helper);
+                 }
             }
         });
 
-         // Add active portals (assuming portal.portalMesh exists)
-         this.activePortals.forEach(portal => {
-             if (portal.portalMesh) {
-                 // Portals might not be solid obstacles, decide if they should be added
-                 // tempBox.setFromObject(portal.portalMesh);
-                 // obstacles.push({ aabb: tempBox.clone(), object: portal.portalMesh });
-             }
-         });
+        // Add active portals - These are generally NOT obstacles
+        // this.activePortals.forEach(portal => { ... });
 
-        // --- Update Game Elements --- 
+        // --- DEBUG: Log collected obstacles ---
+        if (deltaTime > 0) { // Log only once per frame effectively, avoid flooding
+            // console.log(`Frame obstacles: ${obstacles.length}`);
+            // Optionally log names/types of first few obstacles
+            // if (obstacles.length > 0) {
+            //     console.log(`First obstacles:`, obstacles.slice(0, 5).map(o => o.object.name || o.object.type));
+            // }
+        }
+        // --- END DEBUG ---
 
-        // Update character (pass obstacles)
+
+        // --- Update Game Elements ---
+
+        // Update character (pass newly filtered obstacles)
         this.character.update(deltaTime, this.keys, this.camera, obstacles, this.activePortals);
 
         // Update NPCs
