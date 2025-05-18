@@ -60,6 +60,13 @@ export class EBOYIsometricPierScene {
                 }
             }
         });
+
+        // Listen for startGame event from title screen
+        window.addEventListener('startGame', () => {
+            if (this.gameState === GAME_STATE.TITLE) {
+                this.startGame();
+            }
+        });
     }
 
     initializeMainGame() {
@@ -168,6 +175,12 @@ export class EBOYIsometricPierScene {
         // Add main game renderer to container
         const container = document.getElementById('scene-container');
         container.appendChild(this.renderer.domElement);
+
+        // Show chat container
+        const chatContainer = document.getElementById('chat-container');
+        if (chatContainer) {
+            chatContainer.style.display = 'block';
+        }
 
         // Change game state
         this.gameState = GAME_STATE.PLAYING;

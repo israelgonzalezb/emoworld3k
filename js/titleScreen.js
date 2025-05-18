@@ -6,7 +6,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 
-// Custom Chromatic Aberration Shader
+// Custom Chromatic Aberration Shader (remains the same)
 const ChromaticAberrationShader = {
     uniforms: {
         "tDiffuse": { value: null },
@@ -31,95 +31,129 @@ const ChromaticAberrationShader = {
             vec4 cr = texture2D(tDiffuse, vUv + offset);
             vec4 cg = texture2D(tDiffuse, vUv);
             vec4 cb = texture2D(tDiffuse, vUv - offset);
-            gl_FragColor = vec4(cr.r, cg.g, cb.b, 1.0);
+            gl_FragColor = vec4(cr.r, cg.g, cb.b, cg.a); // Use cg.a for alpha
         }
     `
+};
+
+// EMO WORLD AESTHETIC CONSTANTS - ADJUSTED FOR MORE VISIBILITY
+const EMO_COLORS = {
+    SKY_TOP: new THREE.Color(0x121228), // Slightly lighter dark inky purple-blue
+    SKY_BOTTOM: new THREE.Color(0x180D24), // Slightly lighter deeper purple
+    FOG: new THREE.Color(0x1A182C), // Lighter, less dense purplish fog
+    NEON_PINK: new THREE.Color(0xff00ff),
+    NEON_CYAN: new THREE.Color(0x00ffff),
+    NEON_PURPLE: new THREE.Color(0x8a2be2),
+    NEON_BLUE: new THREE.Color(0x0077ff),
+    DIGITAL_RAIN_COLOR: new THREE.Color(0x00ffaa),
+    BUILDING_BASE: new THREE.Color(0x2A2D3A), // Noticeably lighter base for buildings
+    BUILDING_EMISSIVE: new THREE.Color(0x08080C), // Slightly more emissive
+    BALCONY_COLOR: new THREE.Color(0x282830), // Slightly lighter balcony
+    MOON_VISUAL_COLOR: new THREE.Color(0xC0C0E8), // Pale lavender/blue moon
+    MOON_EMISSIVE_COLOR: new THREE.Color(0x9090C0), // Emissive part of the moon
+    MOON_LIGHT_COLOR: new THREE.Color(0xD0D8E8), // Lighter, stronger moonlight
+    FILL_LIGHT_COLOR: new THREE.Color(0x504A65), // Lighter moody purple for fill
 };
 
 export class TitleScreen {
     constructor(container) {
         this.container = container;
         this.scene = new THREE.Scene();
-        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.composer = null;
         this.rainParticles = [];
+        this.digitalRainParticles = null;
         this.neonLights = [];
+        this.holographicAds = [];
         this.titleMesh = null;
-        this.menuItems = [];
-        
+        this.menuItemMeshes = [];
+        this.fontLoader = new FontLoader();
+        this.moonMesh = null;
+        this.raycaster = new THREE.Raycaster();
+        this.mouse = new THREE.Vector2();
+        this.hoveredMenuItem = null;
+
         this.init();
+        this.setupEventListeners();
     }
 
     init() {
-        // Setup renderer
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+        // Optional: Tone mapping can help manage very bright lights and dark shadows
+        // this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        // this.renderer.toneMappingExposure = 1.0;
         this.container.appendChild(this.renderer.domElement);
 
-        // Setup camera - moved closer and adjusted position
-        this.camera.position.set(0, 2, 10);
-        this.camera.lookAt(0, 0, 0);
+        this.camera.position.set(0, 5, 15);
+        this.camera.lookAt(0, 1, -10);
 
-        // Add debug helpers
-        const axesHelper = new THREE.AxesHelper(5);
-        this.scene.add(axesHelper);
-        const gridHelper = new THREE.GridHelper(20, 20);
-        this.scene.add(gridHelper);
+        // Significantly reduced fog density
+        this.scene.fog = new THREE.FogExp2(EMO_COLORS.FOG, 0.010);
 
-        // Setup lighting first
         this.setupLighting();
-
-        // Setup post-processing
         this.setupPostProcessing();
 
-        // Create scene elements
         this.createBackground();
         this.createCityscape();
+        this.createForegroundBalcony();
         this.createRain();
-        this.createTitle();
-        this.createMenu();
-        this.createForeground();
+        this.createDigitalRain();
 
-        // Start animation
+        this.loadFontsAndCreateTextElements();
+
         this.animate();
 
-        // Handle window resize
         window.addEventListener('resize', () => this.onWindowResize());
-
-        // Add fog for depth
-        this.scene.fog = new THREE.FogExp2(0x101020, 0.035);
     }
 
     setupPostProcessing() {
         this.composer = new EffectComposer(this.renderer);
-        // Add render pass
         const renderPass = new RenderPass(this.scene, this.camera);
         this.composer.addPass(renderPass);
 
-        // Add bloom effect for neon glow (reduced intensity)
         const bloomPass = new UnrealBloomPass(
             new THREE.Vector2(window.innerWidth, window.innerHeight),
-            0.7,  // strength reduced from 1.5
-            0.3,  // radius
-            0.85  // threshold
+            0.7,  // Bloom strength
+            0.5,  // Bloom radius
+            0.65  // Bloom threshold (lower means more things bloom)
         );
         this.composer.addPass(bloomPass);
 
-        // Add custom chromatic aberration
-        const chromaticAberration = new ShaderPass(ChromaticAberrationShader);
-        chromaticAberration.uniforms.amount.value = 0.003;
-        chromaticAberration.uniforms.angle.value = 0.0;
-        this.composer.addPass(chromaticAberration);
+        const chromaticAberrationPass = new ShaderPass(ChromaticAberrationShader);
+        chromaticAberrationPass.uniforms.amount.value = 0.0015;
+        this.composer.addPass(chromaticAberrationPass);
+    }
+
+    setupLighting() {
+        // Significantly increased ambient light
+        const ambientLight = new THREE.AmbientLight(EMO_COLORS.FOG, 2.0); // Was 0.9
+        this.scene.add(ambientLight);
+
+        // Main "Moon" light source - significantly stronger
+        const moonLight = new THREE.DirectionalLight(EMO_COLORS.MOON_LIGHT_COLOR, 3.0); // Was 1.2
+        moonLight.position.set(-0.7, 0.8, -1).normalize();
+        this.scene.add(moonLight);
+
+        // Fill light - stronger and better aimed
+        const fillLight = new THREE.DirectionalLight(EMO_COLORS.FILL_LIGHT_COLOR, 1.5); // Was 0.5
+        fillLight.position.set(0.7, 0.5, -1.0).normalize(); // Aimed more towards the city
+        this.scene.add(fillLight);
+
+        // Foreground light
+        const cameraLight = new THREE.PointLight(EMO_COLORS.NEON_CYAN, 0.6, 25); // Slightly stronger
+        cameraLight.position.set(0, 2, 10);
+        this.scene.add(cameraLight);
     }
 
     createBackground() {
-        // Create sky gradient
-        const skyGeometry = new THREE.SphereGeometry(500, 32, 32);
+        const skyGeometry = new THREE.SphereGeometry(1000, 32, 32);
         const skyMaterial = new THREE.ShaderMaterial({
             uniforms: {
-                topColor: { value: new THREE.Color(0x1a1a2e) },
-                bottomColor: { value: new THREE.Color(0x16213e) }
+                topColor: { value: EMO_COLORS.SKY_TOP },
+                bottomColor: { value: EMO_COLORS.SKY_BOTTOM }
             },
             vertexShader: `
                 varying vec3 vWorldPosition;
@@ -135,227 +169,237 @@ export class TitleScreen {
                 varying vec3 vWorldPosition;
                 void main() {
                     float h = normalize(vWorldPosition).y;
-                    gl_FragColor = vec4(mix(bottomColor, topColor, max(0.0, h)), 1.0);
+                    gl_FragColor = vec4(mix(bottomColor, topColor, max(0.0, h) * 0.8 + 0.2), 1.0);
                 }
             `,
             side: THREE.BackSide
         });
         const sky = new THREE.Mesh(skyGeometry, skyMaterial);
         this.scene.add(sky);
+
+        const moonGeometry = new THREE.SphereGeometry(25, 32, 32); // Slightly larger moon
+        const moonMaterial = new THREE.MeshStandardMaterial({
+            color: EMO_COLORS.MOON_VISUAL_COLOR,
+            emissive: EMO_COLORS.MOON_EMISSIVE_COLOR,
+            emissiveIntensity: 1.5, // More glow
+            fog: false
+        });
+        this.moonMesh = new THREE.Mesh(moonGeometry, moonMaterial);
+        this.moonMesh.position.set(-150, 80, -350); // Positioned further and slightly larger
+        this.scene.add(this.moonMesh);
     }
 
     createCityscape() {
-        // Create city buildings
         const buildingGeometry = new THREE.BoxGeometry(1, 1, 1);
-        const buildingMaterial = new THREE.MeshPhongMaterial({
-            color: 0x2a2a3a,
-            specular: 0x222222,
-            shininess: 30,
-            emissive: 0x1a1a2a,
-            emissiveIntensity: 0.2
-        });
+        const numBuildings = 50;
+        const citySpread = 150;
 
-        // Create multiple buildings
-        for (let i = 0; i < 20; i++) {
-            const height = 5 + Math.random() * 15;
-            const building = new THREE.Mesh(buildingGeometry, buildingMaterial.clone());
-            building.scale.set(2 + Math.random() * 3, height, 2 + Math.random() * 3);
+        for (let i = 0; i < numBuildings; i++) {
+            const buildingMaterial = new THREE.MeshStandardMaterial({
+                color: EMO_COLORS.BUILDING_BASE, // Uses new, lighter base color
+                metalness: 0.2, // Less metalness, more diffuse reflection
+                roughness: 0.7, // More roughness
+                emissive: EMO_COLORS.BUILDING_EMISSIVE,
+                emissiveIntensity: 0.5 // Slightly increased building self-glow
+            });
+
+            const height = 10 + Math.random() * 80;
+            const width = 3 + Math.random() * 8;
+            const depth = 3 + Math.random() * 8;
+
+            const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
+            building.scale.set(width, height, depth);
             building.position.set(
-                (Math.random() - 0.5) * 50,
-                height / 2,
-                (Math.random() - 0.5) * 50
+                (Math.random() - 0.5) * citySpread,
+                height / 2 - 10,
+                -(20 + Math.random() * (citySpread / 2))
             );
             this.scene.add(building);
 
-            // Add neon lights to some buildings
-            if (Math.random() > 0.5) {
-                this.addNeonLight(building);
+            if (Math.random() < 0.7) {
+                this.addNeonAccentToBuilding(building);
             }
 
-            // Add neon accent lines to some buildings
-            if (Math.random() > 0.5) {
-                this.addNeonAccent(building);
+            if (height > 40 && Math.random() < 0.3) {
+                this.addHolographicAd(building);
             }
         }
     }
 
-    addNeonLight(building) {
-        // Create a more intense neon light
-        const light = new THREE.PointLight(
-            Math.random() > 0.5 ? 0xff00ff : 0x00ffff,
-            2 + Math.random() * 2,
-            15
-        );
-        light.position.copy(building.position);
-        light.position.y += building.scale.y / 2;
-        this.scene.add(light);
-        this.neonLights.push(light);
-
-        // Add a small glowing sphere at the light position
-        const sphereGeometry = new THREE.SphereGeometry(0.2, 16, 16);
-        const sphereMaterial = new THREE.MeshPhongMaterial({
-            color: light.color,
-            emissive: light.color,
-            emissiveIntensity: 1,
-            transparent: true,
-            opacity: 0.8
-        });
-        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-        sphere.position.copy(light.position);
-        this.scene.add(sphere);
-    }
-
-    addNeonAccent(building) {
-        // Add glowing neon lines to the building
-        const neonColors = [0xff00ff, 0x00ffff, 0x00ff99, 0xffff00, 0x00ffea];
+    addNeonAccentToBuilding(building) {
+        const neonColors = [EMO_COLORS.NEON_PINK, EMO_COLORS.NEON_CYAN, EMO_COLORS.NEON_PURPLE, EMO_COLORS.NEON_BLUE];
         const color = neonColors[Math.floor(Math.random() * neonColors.length)];
-        const neonMaterial = new THREE.MeshBasicMaterial({ color, emissive: color });
-        const accentCount = 1 + Math.floor(Math.random() * 3);
-        for (let i = 0; i < accentCount; i++) {
-            const accentHeight = building.scale.y * (0.2 + 0.6 * Math.random());
-            const accentGeometry = new THREE.BoxGeometry(
-                building.scale.x * (0.8 + 0.2 * Math.random()),
-                0.1,
-                0.1
-            );
-            const accent = new THREE.Mesh(accentGeometry, neonMaterial);
-            accent.position.set(
-                building.position.x,
-                building.position.y - building.scale.y / 2 + accentHeight,
-                building.position.z + building.scale.z / 2 + 0.1
-            );
-            this.scene.add(accent);
-        }
+
+        // Neon point lights now stronger to stand out against brighter scene
+        const accentLight = new THREE.PointLight(color, 3.0, 18 + Math.random() * 12); // Was 2.0 intensity
+        accentLight.position.set(
+            building.position.x + (Math.random() - 0.5) * building.scale.x * 0.5,
+            building.position.y + (Math.random() - 0.5) * building.scale.y * 0.8,
+            building.position.z + (Math.random() > 0.5 ? building.scale.z / 2 : -building.scale.z / 2)
+        );
+        this.scene.add(accentLight);
+        this.neonLights.push({light: accentLight, baseIntensity: accentLight.intensity, flickerSpeed: 0.001 + Math.random() * 0.005});
+
+        const sourceGeo = new THREE.SphereGeometry(0.15 + Math.random() * 0.2, 8, 8); // Slightly larger sources
+        const sourceMat = new THREE.MeshBasicMaterial({ color: color, emissive: color });
+        const sourceMesh = new THREE.Mesh(sourceGeo, sourceMat);
+        sourceMesh.position.copy(accentLight.position);
+        this.scene.add(sourceMesh);
+        this.neonLights.push({mesh: sourceMesh, flickerSpeed: 0.002 + Math.random() * 0.005});
+    }
+
+    addHolographicAd(building) {
+        const adWidth = building.scale.x * (0.5 + Math.random() * 0.5);
+        const adHeight = building.scale.y * (0.2 + Math.random() * 0.3);
+        const adGeometry = new THREE.PlaneGeometry(adWidth, adHeight);
+        
+        const holographicAdMaterial = new THREE.MeshBasicMaterial({
+            color: Math.random() > 0.5 ? EMO_COLORS.NEON_CYAN : EMO_COLORS.NEON_PINK,
+            transparent: true,
+            opacity: 0.4 + Math.random() * 0.3, // Slightly more opaque
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending,
+        });
+
+        const ad = new THREE.Mesh(adGeometry, holographicAdMaterial);
+        ad.position.set(
+            building.position.x,
+            building.position.y + building.scale.y * 0.25 * (Math.random() - 0.5),
+            building.position.z + (building.scale.z / 2 + 0.1) * (Math.random() > 0.5 ? 1 : -1)
+        );
+        ad.lookAt(this.camera.position);
+        this.scene.add(ad);
+        this.holographicAds.push(ad);
     }
 
     createRain() {
-        const rainGeometry = new THREE.BufferGeometry();
-        const rainCount = 1000;
+        const rainCount = 5000;
         const positions = new Float32Array(rainCount * 3);
         const velocities = new Float32Array(rainCount);
 
         for (let i = 0; i < rainCount; i++) {
-            positions[i * 3] = (Math.random() - 0.5) * 50;
-            positions[i * 3 + 1] = Math.random() * 50;
-            positions[i * 3 + 2] = (Math.random() - 0.5) * 50;
-            velocities[i] = 0.1 + Math.random() * 0.3;
+            positions[i * 3] = (Math.random() - 0.5) * 80;
+            positions[i * 3 + 1] = Math.random() * 60;
+            positions[i * 3 + 2] = (Math.random() - 0.5) * 80 - 20;
+            velocities[i] = 0.2 + Math.random() * 0.3;
         }
 
+        const rainGeometry = new THREE.BufferGeometry();
         rainGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        
         const rainMaterial = new THREE.PointsMaterial({
-            color: 0xaaaaaa,
-            size: 0.1,
+            color: 0x8899AA, // Slightly lighter rain
+            size: 0.08,
             transparent: true,
-            opacity: 0.6
+            opacity: 0.5, // Slightly more opaque
+            sizeAttenuation: true,
         });
 
         const rain = new THREE.Points(rainGeometry, rainMaterial);
         this.scene.add(rain);
-        this.rainParticles.push({ points: rain, velocities });
+        this.rainParticles.push({ points: rain, velocities: velocities, type: 'normal' });
     }
 
-    createTitle() {
-        console.log("Creating title...");
-        // Create title text using a simple plane with texture
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.width = 512;
-        canvas.height = 128;
+    createDigitalRain() {
+        const particleCount = 300;
+        const positions = new Float32Array(particleCount * 3);
+        const velocities = new Float32Array(particleCount);
 
-        // Draw background
-        context.fillStyle = 'rgba(0, 0, 0, 0)';
-        context.fillRect(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < particleCount; i++) {
+            positions[i * 3] = (Math.random() - 0.5) * 60;
+            positions[i * 3 + 1] = Math.random() * 50;
+            positions[i * 3 + 2] = (Math.random() - 0.5) * 60 - 15;
+            velocities[i] = 0.05 + Math.random() * 0.05;
+        }
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
-        // Draw text
-        context.font = 'bold 64px Arial';
-        context.fillStyle = '#ff00ff';
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.fillText('EMO WORLD', canvas.width / 2, canvas.height / 2);
-
-        // Create texture
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.needsUpdate = true;
-
-        // Create plane
-        const geometry = new THREE.PlaneGeometry(10, 2.5);
-        const material = new THREE.MeshPhongMaterial({
-            map: texture,
+        const material = new THREE.PointsMaterial({
+            color: EMO_COLORS.DIGITAL_RAIN_COLOR,
+            size: 0.15,
             transparent: true,
-            side: THREE.DoubleSide,
-            color: 0xff00ff,
-            emissive: 0xff00ff,
-            emissiveIntensity: 0.5,
-            shininess: 100
+            opacity: 0.7,
+            blending: THREE.AdditiveBlending,
+            sizeAttenuation: true,
         });
-
-        this.titleMesh = new THREE.Mesh(geometry, material);
-        this.titleMesh.position.set(0, 3, 0);
-        this.scene.add(this.titleMesh);
-
-        // Add a point light for the title
-        const titleLight = new THREE.PointLight(0xff00ff, 3, 10);
-        titleLight.position.set(0, 3, 2);
-        this.scene.add(titleLight);
+        this.digitalRainParticles = new THREE.Points(geometry, material);
+        this.scene.add(this.digitalRainParticles);
+        this.digitalRainParticles.userData.velocities = velocities;
     }
 
-    createMenu() {
-        console.log("Creating menu...");
-        const menuItems = ['START GAME', 'LOAD GAME', 'SETTINGS', 'CREDITS', 'EXIT'];
-        
-        menuItems.forEach((text, index) => {
-            // Create canvas for each menu item
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.width = 256;
-            canvas.height = 64;
-
-            // Draw background
-            context.fillStyle = 'rgba(0, 0, 0, 0)';
-            context.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Draw text
-            context.font = 'bold 32px Arial';
-            context.fillStyle = '#ffffff';
-            context.textAlign = 'center';
-            context.textBaseline = 'middle';
-            context.fillText(text, canvas.width / 2, canvas.height / 2);
-
-            // Create texture
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.needsUpdate = true;
-
-            // Create plane
-            const geometry = new THREE.PlaneGeometry(5, 1.25);
-            const material = new THREE.MeshBasicMaterial({
-                map: texture,
-                transparent: true,
-                side: THREE.DoubleSide,
-                color: 0xffffff  // Added white color to make it more visible
+    loadFontsAndCreateTextElements() {
+        this.fontLoader.load('https://threejs.org/examples/fonts/helvetiker_bold.typeface.json', (font) => {
+            const textGeometry = new TextGeometry('EMO WORLD', {
+                font: font,
+                size: 1.2,
+                height: 0.1,
+                curveSegments: 12,
+                bevelEnabled: true,
+                bevelThickness: 0.03,
+                bevelSize: 0.02,
+                bevelOffset: 0,
+                bevelSegments: 5
             });
+            textGeometry.center();
 
-            const textMesh = new THREE.Mesh(geometry, material);
-            textMesh.position.set(0, 1 - index * 0.8, 0);  // Moved closer to camera
-            this.scene.add(textMesh);
-            this.menuItems.push(textMesh);
-        });
+            const textMaterial = new THREE.MeshStandardMaterial({
+                color: EMO_COLORS.NEON_PINK,
+                emissive: EMO_COLORS.NEON_PINK,
+                emissiveIntensity: 1.0,
+                metalness: 0.1,
+                roughness: 0.5,
+            });
+            this.titleMesh = new THREE.Mesh(textGeometry, textMaterial);
+            this.titleMesh.position.set(0, 6, -2);
+            this.scene.add(this.titleMesh);
+        }, undefined, (err) => console.error('Error loading title font:', err));
+
+        const menuItems = ['ENTER', 'SETTINGS', 'ABOUT'];
+        this.fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', (font) => {
+            menuItems.forEach((text, index) => {
+                const itemGeometry = new TextGeometry(text, {
+                    font: font,
+                    size: 0.35,
+                    height: 0.05,
+                    curveSegments: 4,
+                    bevelEnabled: false
+                });
+                itemGeometry.center();
+
+                const itemMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xeeeeff,
+                    emissive: 0xaaaacc,
+                    emissiveIntensity: 0.5,
+                });
+                const textMesh = new THREE.Mesh(itemGeometry, itemMaterial);
+                textMesh.position.set(0, 3.5 - index * 0.7, 0);
+                textMesh.userData.text = text; // Store the menu text for click handling
+                this.scene.add(textMesh);
+                this.menuItemMeshes.push(textMesh);
+            });
+        }, undefined, (err) => console.error('Error loading menu font:', err));
     }
 
-    createForeground() {
-        // Create balcony/railing
-        const railingGeometry = new THREE.BoxGeometry(10, 0.1, 0.5);
-        const railingMaterial = new THREE.MeshPhongMaterial({
-            color: 0x333333,
-            specular: 0x111111,
-            shininess: 30
+    createForegroundBalcony() {
+        const mainRailGeo = new THREE.BoxGeometry(12, 0.2, 0.2);
+        const supportGeo = new THREE.BoxGeometry(0.2, 2, 0.2);
+        const balconyMaterial = new THREE.MeshStandardMaterial({
+            color: EMO_COLORS.BALCONY_COLOR,
+            metalness: 0.5,
+            roughness: 0.5,
         });
-        const railing = new THREE.Mesh(railingGeometry, railingMaterial);
-        railing.position.set(0, -2, -5);
-        this.scene.add(railing);
 
-        // Add some ambient light
-        const ambientLight = new THREE.AmbientLight(0x404040);
-        this.scene.add(ambientLight);
+        const mainRail = new THREE.Mesh(mainRailGeo, balconyMaterial);
+        mainRail.position.set(0, 0.5, 5);
+        this.scene.add(mainRail);
+
+        const supportLeft = new THREE.Mesh(supportGeo, balconyMaterial);
+        supportLeft.position.set(-5.8, -0.5, 5);
+        this.scene.add(supportLeft);
+
+        const supportRight = new THREE.Mesh(supportGeo, balconyMaterial);
+        supportRight.position.set(5.8, -0.5, 5);
+        this.scene.add(supportRight);
     }
 
     onWindowResize() {
@@ -365,78 +409,131 @@ export class TitleScreen {
         this.composer.setSize(window.innerWidth, window.innerHeight);
     }
 
-    animate() {
-        requestAnimationFrame(() => this.animate());
+    setupEventListeners() {
+        window.addEventListener('mousemove', (event) => {
+            // Calculate mouse position in normalized device coordinates (-1 to +1)
+            this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        });
 
-        // Camera slow pan
-        const t = Date.now() * 0.0002;
-        this.camera.position.x = Math.sin(t) * 2;
-        this.camera.position.z = 10 + Math.cos(t) * 2;
-        this.camera.lookAt(0, 0, 0);
-
-        // Update rain
-        this.rainParticles.forEach(particle => {
-            const positions = particle.points.geometry.attributes.position.array;
-            for (let i = 0; i < positions.length; i += 3) {
-                positions[i + 1] -= particle.velocities[i / 3];
-                if (positions[i + 1] < 0) {
-                    positions[i + 1] = 50;
+        window.addEventListener('click', (event) => {
+            if (this.hoveredMenuItem) {
+                const menuText = this.hoveredMenuItem.userData.text;
+                switch (menuText) {
+                    case 'ENTER':
+                        // Dispatch custom event for game start
+                        window.dispatchEvent(new CustomEvent('startGame'));
+                        break;
+                    case 'SETTINGS':
+                        // TODO: Implement settings menu
+                        console.log('Settings clicked');
+                        break;
+                    case 'ABOUT':
+                        // TODO: Implement about screen
+                        console.log('About clicked');
+                        break;
                 }
             }
-            particle.points.geometry.attributes.position.needsUpdate = true;
         });
+    }
 
-        // Update neon lights
-        this.neonLights.forEach(light => {
-            light.intensity = 1 + Math.sin(Date.now() * 0.001) * 0.2;
-        });
+    animate() {
+        requestAnimationFrame(() => this.animate());
+        const time = Date.now();
+        const slowTime = time * 0.0001;
 
-        // Update title glow
-        if (this.titleMesh && this.titleMesh.material) {
-            this.titleMesh.material.emissiveIntensity = 0.5 + Math.sin(Date.now() * 0.001) * 0.2;
+        // Update raycaster
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        const intersects = this.raycaster.intersectObjects(this.menuItemMeshes);
+
+        // Handle hover effects
+        if (intersects.length > 0) {
+            const hoveredMesh = intersects[0].object;
+            if (this.hoveredMenuItem !== hoveredMesh) {
+                // Reset previous hover
+                if (this.hoveredMenuItem) {
+                    this.hoveredMenuItem.material.emissiveIntensity = 0.5;
+                    this.hoveredMenuItem.scale.set(1, 1, 1);
+                }
+                // Set new hover
+                this.hoveredMenuItem = hoveredMesh;
+                this.hoveredMenuItem.material.emissiveIntensity = 1.0;
+                this.hoveredMenuItem.scale.set(1.1, 1.1, 1.1);
+            }
+        } else if (this.hoveredMenuItem) {
+            // Reset hover when mouse leaves menu item
+            this.hoveredMenuItem.material.emissiveIntensity = 0.5;
+            this.hoveredMenuItem.scale.set(1, 1, 1);
+            this.hoveredMenuItem = null;
         }
 
-        // Update chromatic aberration
+        this.camera.position.x = Math.sin(slowTime * 0.3) * 0.5;
+        this.camera.position.y = 5 + Math.cos(slowTime * 0.2) * 0.2;
+        this.camera.lookAt(0, 1 + Math.sin(slowTime * 0.1) * 0.5, -10);
+
+        this.rainParticles.forEach(particleSystem => {
+            const positions = particleSystem.points.geometry.attributes.position.array;
+            const velocities = particleSystem.velocities;
+            for (let i = 0; i < velocities.length; i++) {
+                positions[i * 3 + 1] -= velocities[i];
+                if (positions[i * 3 + 1] < -10) {
+                    positions[i * 3 + 1] = 50 + Math.random() * 10;
+                }
+            }
+            particleSystem.points.geometry.attributes.position.needsUpdate = true;
+        });
+
+        if (this.digitalRainParticles) {
+            const positions = this.digitalRainParticles.geometry.attributes.position.array;
+            const velocities = this.digitalRainParticles.userData.velocities;
+            for (let i = 0; i < velocities.length; i++) {
+                positions[i * 3 + 1] -= velocities[i];
+                if (positions[i * 3 + 1] < -5) {
+                    positions[i * 3 + 1] = 40 + Math.random() * 10;
+                }
+            }
+            this.digitalRainParticles.geometry.attributes.position.needsUpdate = true;
+            this.digitalRainParticles.material.opacity = 0.5 + Math.sin(time * 0.005 + Math.random()) * 0.2;
+        }
+
+        this.neonLights.forEach(item => {
+            if (item.light) {
+                item.light.intensity = item.baseIntensity * (0.8 + Math.sin(time * item.flickerSpeed + Math.random() * Math.PI) * 0.2);
+                if (Math.random() < 0.005) {
+                    item.light.intensity = item.baseIntensity * 0.1;
+                }
+            } else if (item.mesh && item.mesh.material.emissive) {
+                 item.mesh.material.opacity = (0.6 + Math.sin(time * item.flickerSpeed * 2.0 + Math.random() * Math.PI) * 0.4);
+            }
+        });
+
+        this.holographicAds.forEach(ad => {
+            ad.material.opacity = 0.3 + Math.sin(time * 0.002 + ad.uuid.length) * 0.2;
+            if (Math.random() < 0.01) {
+                ad.position.x += (Math.random() - 0.5) * 0.1;
+                ad.position.y += (Math.random() - 0.5) * 0.1;
+            }
+        });
+
+        if (this.titleMesh && this.titleMesh.material.emissive) {
+            this.titleMesh.material.emissiveIntensity = 0.9 + Math.sin(time * 0.0015) * 0.3;
+            this.titleMesh.rotation.y = Math.sin(time * 0.0002) * 0.01;
+            this.titleMesh.rotation.x = Math.cos(time * 0.00023) * 0.005;
+        }
+        this.menuItemMeshes.forEach(item => {
+             if (item.material.emissive) {
+                 item.material.emissiveIntensity = 0.4 + Math.sin(time * 0.001 + item.uuid.length) * 0.2;
+             }
+        });
+
         if (this.composer) {
             const chromaticAberrationPass = this.composer.passes.find(pass => pass.uniforms && pass.uniforms.amount);
             if (chromaticAberrationPass) {
-                // Subtle rotation of the chromatic aberration
-                chromaticAberrationPass.uniforms.angle.value = Date.now() * 0.0001;
-                // Subtle pulsing of the effect
-                chromaticAberrationPass.uniforms.amount.value = 0.003 + Math.sin(Date.now() * 0.0005) * 0.001;
+                chromaticAberrationPass.uniforms.angle.value = slowTime * 0.5;
+                chromaticAberrationPass.uniforms.amount.value = 0.0015 + Math.abs(Math.sin(time * 0.0003)) * 0.003;
             }
         }
 
-        // Render scene
         this.composer.render();
     }
-
-    setupLighting() {
-        // Add ambient light - increased intensity for better overall visibility
-        const ambientLight = new THREE.AmbientLight(0x404040, 1.5);
-        this.scene.add(ambientLight);
-
-        // Add directional light - adjusted for better shadows and depth
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 2.5);
-        directionalLight.position.set(10, 15, 10);
-        this.scene.add(directionalLight);
-
-        // Add colored point lights for neon effect
-        const pinkLight = new THREE.PointLight(0xff00ff, 3, 20);
-        pinkLight.position.set(10, 5, 10);
-        this.scene.add(pinkLight);
-
-        const cyanLight = new THREE.PointLight(0x00ffff, 3, 20);
-        cyanLight.position.set(-10, 5, -10);
-        this.scene.add(cyanLight);
-
-        // Add additional accent lights
-        const purpleLight = new THREE.PointLight(0x8000ff, 2, 15);
-        purpleLight.position.set(0, 8, -15);
-        this.scene.add(purpleLight);
-
-        const blueLight = new THREE.PointLight(0x0080ff, 2, 15);
-        blueLight.position.set(-15, 8, 0);
-        this.scene.add(blueLight);
-    }
-} 
+}
