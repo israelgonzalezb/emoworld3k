@@ -1,3 +1,4 @@
+// js/titleScreen.js
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -38,21 +39,21 @@ const ChromaticAberrationShader = {
 
 // EMO WORLD AESTHETIC CONSTANTS - ADJUSTED FOR MORE VISIBILITY
 const EMO_COLORS = {
-    SKY_TOP: new THREE.Color(0x121228), // Slightly lighter dark inky purple-blue
-    SKY_BOTTOM: new THREE.Color(0x180D24), // Slightly lighter deeper purple
-    FOG: new THREE.Color(0x1A182C), // Lighter, less dense purplish fog
+    SKY_TOP: new THREE.Color(0x1A1C38),      // Was 0x121228 (Lighter purple-blue)
+    SKY_BOTTOM: new THREE.Color(0x201530),   // Was 0x180D24 (Lighter deep purple)
+    FOG: new THREE.Color(0x202035),          // Was 0x1A182C (Slightly lighter fog)
     NEON_PINK: new THREE.Color(0xff00ff),
     NEON_CYAN: new THREE.Color(0x00ffff),
     NEON_PURPLE: new THREE.Color(0x8a2be2),
     NEON_BLUE: new THREE.Color(0x0077ff),
     DIGITAL_RAIN_COLOR: new THREE.Color(0x00ffaa),
-    BUILDING_BASE: new THREE.Color(0x2A2D3A), // Noticeably lighter base for buildings
-    BUILDING_EMISSIVE: new THREE.Color(0x08080C), // Slightly more emissive
-    BALCONY_COLOR: new THREE.Color(0x282830), // Slightly lighter balcony
-    MOON_VISUAL_COLOR: new THREE.Color(0xC0C0E8), // Pale lavender/blue moon
-    MOON_EMISSIVE_COLOR: new THREE.Color(0x9090C0), // Emissive part of the moon
-    MOON_LIGHT_COLOR: new THREE.Color(0xD0D8E8), // Lighter, stronger moonlight
-    FILL_LIGHT_COLOR: new THREE.Color(0x504A65), // Lighter moody purple for fill
+    BUILDING_BASE: new THREE.Color(0x353845), // Was 0x2A2D3A (Noticeably lighter base for buildings)
+    BUILDING_EMISSIVE: new THREE.Color(0x101018),// Was 0x08080C (Slightly more emissive for window illusion)
+    BALCONY_COLOR: new THREE.Color(0x282830),
+    MOON_VISUAL_COLOR: new THREE.Color(0xC0C0E8),
+    MOON_EMISSIVE_COLOR: new THREE.Color(0x9090C0),
+    MOON_LIGHT_COLOR: new THREE.Color(0xE0E8F8),  // Was 0xD0D8E8 (Slightly brighter, cooler moonlight)
+    FILL_LIGHT_COLOR: new THREE.Color(0x605A75),   // Was 0x504A65 (Slightly lighter moody purple for fill)
 };
 
 export class TitleScreen {
@@ -90,8 +91,8 @@ export class TitleScreen {
         this.camera.position.set(0, 5, 15);
         this.camera.lookAt(0, 1, -10);
 
-        // Significantly reduced fog density
-        this.scene.fog = new THREE.FogExp2(EMO_COLORS.FOG, 0.010);
+        // Slightly reduced fog density and using updated EMO_COLORS.FOG
+        this.scene.fog = new THREE.FogExp2(EMO_COLORS.FOG, 0.008); // Was 0.010
 
         this.setupLighting();
         this.setupPostProcessing();
@@ -116,9 +117,9 @@ export class TitleScreen {
 
         const bloomPass = new UnrealBloomPass(
             new THREE.Vector2(window.innerWidth, window.innerHeight),
-            0.7,  // Bloom strength
-            0.5,  // Bloom radius
-            0.65  // Bloom threshold (lower means more things bloom)
+            0.6,  // Bloom strength (was 0.7)
+            0.4,  // Bloom radius (was 0.5)
+            0.7  // Bloom threshold (was 0.65 - higher means fewer, brighter things bloom)
         );
         this.composer.addPass(bloomPass);
 
@@ -128,22 +129,22 @@ export class TitleScreen {
     }
 
     setupLighting() {
-        // Significantly increased ambient light
-        const ambientLight = new THREE.AmbientLight(EMO_COLORS.FOG, 2.0); // Was 0.9
+        // Increased ambient light intensity
+        const ambientLight = new THREE.AmbientLight(EMO_COLORS.FOG, 2.5); // Was 2.0
         this.scene.add(ambientLight);
 
-        // Main "Moon" light source - significantly stronger
-        const moonLight = new THREE.DirectionalLight(EMO_COLORS.MOON_LIGHT_COLOR, 3.0); // Was 1.2
+        // Main "Moon" light source - stronger
+        const moonLight = new THREE.DirectionalLight(EMO_COLORS.MOON_LIGHT_COLOR, 3.5); // Was 3.0
         moonLight.position.set(-0.7, 0.8, -1).normalize();
         this.scene.add(moonLight);
 
         // Fill light - stronger and better aimed
-        const fillLight = new THREE.DirectionalLight(EMO_COLORS.FILL_LIGHT_COLOR, 1.5); // Was 0.5
-        fillLight.position.set(0.7, 0.5, -1.0).normalize(); // Aimed more towards the city
+        const fillLight = new THREE.DirectionalLight(EMO_COLORS.FILL_LIGHT_COLOR, 1.8); // Was 1.5
+        fillLight.position.set(0.7, 0.5, -1.0).normalize();
         this.scene.add(fillLight);
 
         // Foreground light
-        const cameraLight = new THREE.PointLight(EMO_COLORS.NEON_CYAN, 0.6, 25); // Slightly stronger
+        const cameraLight = new THREE.PointLight(EMO_COLORS.NEON_CYAN, 0.6, 25);
         cameraLight.position.set(0, 2, 10);
         this.scene.add(cameraLight);
     }
@@ -177,15 +178,15 @@ export class TitleScreen {
         const sky = new THREE.Mesh(skyGeometry, skyMaterial);
         this.scene.add(sky);
 
-        const moonGeometry = new THREE.SphereGeometry(25, 32, 32); // Slightly larger moon
+        const moonGeometry = new THREE.SphereGeometry(25, 32, 32);
         const moonMaterial = new THREE.MeshStandardMaterial({
             color: EMO_COLORS.MOON_VISUAL_COLOR,
             emissive: EMO_COLORS.MOON_EMISSIVE_COLOR,
-            emissiveIntensity: 1.5, // More glow
+            emissiveIntensity: 1.5,
             fog: false
         });
         this.moonMesh = new THREE.Mesh(moonGeometry, moonMaterial);
-        this.moonMesh.position.set(-150, 80, -350); // Positioned further and slightly larger
+        this.moonMesh.position.set(-150, 80, -350);
         this.scene.add(this.moonMesh);
     }
 
@@ -197,10 +198,10 @@ export class TitleScreen {
         for (let i = 0; i < numBuildings; i++) {
             const buildingMaterial = new THREE.MeshStandardMaterial({
                 color: EMO_COLORS.BUILDING_BASE, // Uses new, lighter base color
-                metalness: 0.2, // Less metalness, more diffuse reflection
-                roughness: 0.7, // More roughness
+                metalness: 0.15, // Was 0.2 (Less metalness)
+                roughness: 0.8, // Was 0.7 (More roughness)
                 emissive: EMO_COLORS.BUILDING_EMISSIVE,
-                emissiveIntensity: 0.5 // Slightly increased building self-glow
+                emissiveIntensity: 0.6 // Was 0.5 (Slightly increased building self-glow)
             });
 
             const height = 10 + Math.random() * 80;
@@ -230,8 +231,7 @@ export class TitleScreen {
         const neonColors = [EMO_COLORS.NEON_PINK, EMO_COLORS.NEON_CYAN, EMO_COLORS.NEON_PURPLE, EMO_COLORS.NEON_BLUE];
         const color = neonColors[Math.floor(Math.random() * neonColors.length)];
 
-        // Neon point lights now stronger to stand out against brighter scene
-        const accentLight = new THREE.PointLight(color, 3.0, 18 + Math.random() * 12); // Was 2.0 intensity
+        const accentLight = new THREE.PointLight(color, 3.0, 18 + Math.random() * 12);
         accentLight.position.set(
             building.position.x + (Math.random() - 0.5) * building.scale.x * 0.5,
             building.position.y + (Math.random() - 0.5) * building.scale.y * 0.8,
@@ -240,7 +240,7 @@ export class TitleScreen {
         this.scene.add(accentLight);
         this.neonLights.push({light: accentLight, baseIntensity: accentLight.intensity, flickerSpeed: 0.001 + Math.random() * 0.005});
 
-        const sourceGeo = new THREE.SphereGeometry(0.15 + Math.random() * 0.2, 8, 8); // Slightly larger sources
+        const sourceGeo = new THREE.SphereGeometry(0.15 + Math.random() * 0.2, 8, 8);
         const sourceMat = new THREE.MeshBasicMaterial({ color: color, emissive: color });
         const sourceMesh = new THREE.Mesh(sourceGeo, sourceMat);
         sourceMesh.position.copy(accentLight.position);
@@ -256,7 +256,7 @@ export class TitleScreen {
         const holographicAdMaterial = new THREE.MeshBasicMaterial({
             color: Math.random() > 0.5 ? EMO_COLORS.NEON_CYAN : EMO_COLORS.NEON_PINK,
             transparent: true,
-            opacity: 0.4 + Math.random() * 0.3, // Slightly more opaque
+            opacity: 0.4 + Math.random() * 0.3,
             side: THREE.DoubleSide,
             blending: THREE.AdditiveBlending,
         });
@@ -288,10 +288,10 @@ export class TitleScreen {
         rainGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         
         const rainMaterial = new THREE.PointsMaterial({
-            color: 0x8899AA, // Slightly lighter rain
+            color: 0x8899AA,
             size: 0.08,
             transparent: true,
-            opacity: 0.5, // Slightly more opaque
+            opacity: 0.5,
             sizeAttenuation: true,
         });
 
@@ -411,7 +411,6 @@ export class TitleScreen {
 
     setupEventListeners() {
         window.addEventListener('mousemove', (event) => {
-            // Calculate mouse position in normalized device coordinates (-1 to +1)
             this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
         });
@@ -421,15 +420,12 @@ export class TitleScreen {
                 const menuText = this.hoveredMenuItem.userData.text;
                 switch (menuText) {
                     case 'ENTER':
-                        // Dispatch custom event for game start
                         window.dispatchEvent(new CustomEvent('startGame'));
                         break;
                     case 'SETTINGS':
-                        // TODO: Implement settings menu
                         console.log('Settings clicked');
                         break;
                     case 'ABOUT':
-                        // TODO: Implement about screen
                         console.log('About clicked');
                         break;
                 }
@@ -442,26 +438,21 @@ export class TitleScreen {
         const time = Date.now();
         const slowTime = time * 0.0001;
 
-        // Update raycaster
         this.raycaster.setFromCamera(this.mouse, this.camera);
         const intersects = this.raycaster.intersectObjects(this.menuItemMeshes);
 
-        // Handle hover effects
         if (intersects.length > 0) {
             const hoveredMesh = intersects[0].object;
             if (this.hoveredMenuItem !== hoveredMesh) {
-                // Reset previous hover
                 if (this.hoveredMenuItem) {
                     this.hoveredMenuItem.material.emissiveIntensity = 0.5;
                     this.hoveredMenuItem.scale.set(1, 1, 1);
                 }
-                // Set new hover
                 this.hoveredMenuItem = hoveredMesh;
                 this.hoveredMenuItem.material.emissiveIntensity = 1.0;
                 this.hoveredMenuItem.scale.set(1.1, 1.1, 1.1);
             }
         } else if (this.hoveredMenuItem) {
-            // Reset hover when mouse leaves menu item
             this.hoveredMenuItem.material.emissiveIntensity = 0.5;
             this.hoveredMenuItem.scale.set(1, 1, 1);
             this.hoveredMenuItem = null;
