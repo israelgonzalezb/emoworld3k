@@ -3,16 +3,18 @@ import * as THREE from 'three';
 import { createStandardMaterial, createBoxGeometry } from './utils.js';
 import { Vinyl } from './vinyl.js';
 import { SpeechBubble } from './speechBubble.js';
-import { Box3 } from 'three'; // Import Box3
+import { Box3 } from 'three';
 
+// Centralized color palette matching sprite inspiration
 const CHARACTER_COLORS = {
     SKIN: 0xffdbac,
-    HAIR: 0x5D3A1F, // Medium warm brown, closer to sprite
-    HOODIE: 0x0A0A0A, // Very dark grey, almost black (sprite has pure black)
-    PANTS: 0x030303,  // Darker than hoodie, very close to black
-    SHOES_UPPER: 0x050505, // Black for shoes
-    SHOES_SOLE_LACES: 0xFFFFFF,
-    DRAWSTRINGS: 0xE0E0E0, // Off-white
+    HAIR: 0x5D3A1F, 
+    HOODIE: 0x0A0A0A, 
+    PANTS: 0x030303,  
+    SHOES_UPPER: 0x050505, 
+    SHOES_SOLE: 0xF0F0F0, // Slightly off-white for sole to differentiate
+    SHOES_LACES_TOECAP: 0xFFFFFF, // Pure white for laces and potential toe cap
+    DRAWSTRINGS: 0xE0E0E0,
     EYES: 0x000000,
 };
 
@@ -20,247 +22,264 @@ const CHARACTER_COLORS = {
 export class Character {
     constructor(scene, chatSystem, name = 'Character') {
         this.scene = scene;
-        this.chatSystem = chatSystem; // Store chatSystem
-        this.name = name; // Store name
+        this.chatSystem = chatSystem;
+        this.name = name;
         this.createCharacter();
         this.setupState();
         
-        // Add vinyl shooting properties
         this.vinyls = [];
         this.lastShootTime = 0;
-        this.shootCooldown = 0.5; // Half second cooldown between shots
+        this.shootCooldown = 0.5;
         
-        // Add speech bubble properties
         this.activeSpeechBubble = null;
 
-        // Add to scene
         this.scene.add(this.characterGroup);
-        // console.log(`${this.name} added to scene:`, scene.uuid); // Keep for debugging if needed
     }
 
     createCharacter() {
-        // Create character group
         this.characterGroup = new THREE.Group();
-        this.characterGroup.name = this.name; // Assign name to group
+        this.characterGroup.name = this.name;
         
-        // Body - slim hoodie
-        const bodyGeometry = createBoxGeometry(0.5, 1.1, 0.3); 
-        const bodyMaterial = createStandardMaterial(CHARACTER_COLORS.HOODIE, 0.8, 0.1); // Less shiny
+        // Body (Hoodie Torso) - Slightly adjusted for silhouette
+        const bodyGeometry = createBoxGeometry(0.52, 1.05, 0.32); // Slightly wider, little shorter
+        const bodyMaterial = createStandardMaterial(CHARACTER_COLORS.HOODIE, 0.85, 0.1); // More matte
         const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        body.position.set(0, 0.55, 0); 
+        body.position.set(0, 0.525, 0); // Centered based on new height
         body.name = 'hoodie_torso'; 
         this.characterGroup.add(body);
         
-        // Hood - resting on back
-        const hoodMainGeometry = createBoxGeometry(0.45, 0.4, 0.25);
-        const hoodMaterial = createStandardMaterial(CHARACTER_COLORS.HOODIE, 0.8, 0.1);
-        const hoodMain = new THREE.Mesh(hoodMainGeometry, hoodMaterial);
-        hoodMain.position.set(0, 1.0, -0.15); 
-        hoodMain.rotation.x = 0.3; 
-        hoodMain.name = 'hood';
-        this.characterGroup.add(hoodMain);
+        // Hood - More volume and slouch
+        const hoodMaterial = createStandardMaterial(CHARACTER_COLORS.HOODIE, 0.85, 0.1);
+        
+        // Main back part of the hood
+        const hoodBackMain = new THREE.Mesh(createBoxGeometry(0.48, 0.45, 0.20), hoodMaterial);
+        hoodBackMain.position.set(0, 0.95, -0.18); // Lowered and further back
+        hoodBackMain.rotation.x = 0.4; 
+        hoodBackMain.name = 'hood_back_main';
+        this.characterGroup.add(hoodBackMain);
 
-        const hoodTopGeometry = createBoxGeometry(0.40, 0.15, 0.2);
-        const hoodTop = new THREE.Mesh(hoodTopGeometry, hoodMaterial);
-        hoodTop.position.set(0, 1.20, -0.12); // Adjusted to sit better
-        hoodTop.rotation.x = -0.2;
-        hoodTop.name = 'hood_top_edge';
-        this.characterGroup.add(hoodTop);
+        // Part of hood resting on shoulders
+        const hoodShoulderPart = new THREE.Mesh(createBoxGeometry(0.52, 0.2, 0.25), hoodMaterial);
+        hoodShoulderPart.position.set(0, 1.0, -0.05); // Slightly forward, on shoulders
+        hoodShoulderPart.rotation.x = 0.1;
+        hoodShoulderPart.name = 'hood_shoulder';
+        this.characterGroup.add(hoodShoulderPart);
 
+        // Hood opening edge (refined)
+        const hoodOpeningEdge = new THREE.Mesh(createBoxGeometry(0.42, 0.12, 0.22), hoodMaterial); 
+        hoodOpeningEdge.position.set(0, 1.18, -0.08); // Adjusted for new hood shape
+        hoodOpeningEdge.rotation.x = -0.25; 
+        hoodOpeningEdge.name = 'hood_opening_edge';
+        this.characterGroup.add(hoodOpeningEdge);
 
         // Hoodie pocket
-        const pocketGeometry = createBoxGeometry(0.3, 0.2, 0.05); 
+        const pocketGeometry = createBoxGeometry(0.32, 0.18, 0.05); // Slightly wider pocket
         const pocket = new THREE.Mesh(pocketGeometry, bodyMaterial);
-        pocket.position.set(0, 0.30, 0.155); 
+        pocket.position.set(0, 0.28, 0.165); // Adjusted position
         pocket.name = 'pocket';
         this.characterGroup.add(pocket);
 
-        // Hoodie drawstrings - longer and more visible
-        const drawstringGeometry = createBoxGeometry(0.025, 0.25, 0.025); 
-        const drawstringMaterial = createStandardMaterial(CHARACTER_COLORS.DRAWSTRINGS, 0.9);
+        // Hoodie drawstrings - longer, thinner
+        const drawstringGeometry = createBoxGeometry(0.02, 0.30, 0.02); 
+        const drawstringMaterial = createStandardMaterial(CHARACTER_COLORS.DRAWSTRINGS, 0.95);
         
         const leftDrawstring = new THREE.Mesh(drawstringGeometry, drawstringMaterial);
-        leftDrawstring.position.set(-0.08, 0.95, 0.13); // Slightly higher origin for hanging
-        leftDrawstring.rotation.z = 0.05; // Less angled
-        leftDrawstring.rotation.x = 0.05;
+        leftDrawstring.position.set(-0.085, 0.90, 0.14); 
+        leftDrawstring.rotation.z = 0.08;
+        leftDrawstring.rotation.x = 0.1;
         this.characterGroup.add(leftDrawstring);
         
         const rightDrawstring = new THREE.Mesh(drawstringGeometry, drawstringMaterial);
-        rightDrawstring.position.set(0.08, 0.95, 0.13); 
-        rightDrawstring.rotation.z = -0.05;
-        rightDrawstring.rotation.x = 0.05;
+        rightDrawstring.position.set(0.085, 0.90, 0.14); 
+        rightDrawstring.rotation.z = -0.08;
+        rightDrawstring.rotation.x = 0.1;
         this.characterGroup.add(rightDrawstring);
         
         // Head
-        const headGeometry = createBoxGeometry(0.32, 0.38, 0.32); 
-        const headMaterial = createStandardMaterial(CHARACTER_COLORS.SKIN, 0.9);
+        const headGeometry = createBoxGeometry(0.32, 0.38, 0.30); // Slightly slimmer depth
+        const headMaterial = createStandardMaterial(CHARACTER_COLORS.SKIN, 0.95, 0.05); // Matte skin
         const head = new THREE.Mesh(headGeometry, headMaterial);
-        head.position.set(0, 1.23, 0); 
+        head.position.set(0, 1.20, 0); // Adjusted base Y position
         head.name = 'head';
         this.characterGroup.add(head);
         
-        // Eyes - simple black dots/rectangles
-        const eyeGeometry = createBoxGeometry(0.07, 0.08, 0.03); 
-        const eyeMaterial = createStandardMaterial(CHARACTER_COLORS.EYES, 1.0); // Pure black, no shine
+        // Eyes
+        const eyeGeometry = createBoxGeometry(0.065, 0.07, 0.03); 
+        const eyeMaterial = createStandardMaterial(CHARACTER_COLORS.EYES, 1.0);
         
         const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        leftEye.position.set(-0.08, 1.30, 0.155); // Forward on Z
+        leftEye.position.set(-0.075, 1.28, 0.145); 
         leftEye.name = 'leftEye';
         this.characterGroup.add(leftEye);
         
         const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        rightEye.position.set(0.08, 1.30, 0.155); 
+        rightEye.position.set(0.075, 1.28, 0.145);
         rightEye.name = 'rightEye';
         this.characterGroup.add(rightEye);
 
-        // Eyebrows - subtle, matching hair color
-        const eyebrowGeometry = createBoxGeometry(0.1, 0.025, 0.02);
+        // Eyebrows
+        const eyebrowGeometry = createBoxGeometry(0.09, 0.022, 0.02);
         const eyebrowMaterial = createStandardMaterial(CHARACTER_COLORS.HAIR, 0.9);
         
         const leftEyebrow = new THREE.Mesh(eyebrowGeometry, eyebrowMaterial);
-        leftEyebrow.position.set(-0.08, 1.38, 0.158); 
-        leftEyebrow.rotation.z = -0.05; 
+        leftEyebrow.position.set(-0.075, 1.36, 0.148); 
+        leftEyebrow.rotation.z = -0.08; 
         leftEyebrow.name = 'leftEyebrow';
         this.characterGroup.add(leftEyebrow);
         
         const rightEyebrow = new THREE.Mesh(eyebrowGeometry, eyebrowMaterial);
-        rightEyebrow.position.set(0.08, 1.38, 0.158);
-        rightEyebrow.rotation.z = 0.05;
+        rightEyebrow.position.set(0.075, 1.36, 0.148);
+        rightEyebrow.rotation.z = 0.08;
         rightEyebrow.name = 'rightEyebrow';
         this.characterGroup.add(rightEyebrow);
 
-        // Nose - simple angular shape
-        const noseGeometry = createBoxGeometry(0.04, 0.06, 0.04);
-        // Slightly darker skin for nose shadow/definition
-        const noseMaterial = createStandardMaterial(new THREE.Color(CHARACTER_COLORS.SKIN).multiplyScalar(0.9), 0.9);
+        // Nose
+        const noseGeometry = createBoxGeometry(0.035, 0.05, 0.035);
+        const noseMaterial = createStandardMaterial(new THREE.Color(CHARACTER_COLORS.SKIN).multiplyScalar(0.92), 0.95);
         const nose = new THREE.Mesh(noseGeometry, noseMaterial);
-        nose.position.set(0, 1.28, 0.16); 
+        nose.position.set(0, 1.26, 0.15); 
         nose.name = 'nose';
         this.characterGroup.add(nose);
         
-        // Hair - Reworked to match sprite (short sides, voluminous top swept to side)
-        const hairMaterial = createStandardMaterial(CHARACTER_COLORS.HAIR, 0.85, 0.15);
+        // Hair - Refined sprite-accurate hair
+        const hairMaterial = createStandardMaterial(CHARACTER_COLORS.HAIR, 0.9, 0.1);
 
-        // Top hair main mass (slightly to character's right for sweep)
-        const hairTopMainGeom = createBoxGeometry(0.28, 0.22, 0.26);
+        // Top hair mass - main volume for the quiff
+        const hairTopMainGeom = createBoxGeometry(0.30, 0.24, 0.28); // Slightly wider, taller
         const hairTopMain = new THREE.Mesh(hairTopMainGeom, hairMaterial);
-        hairTopMain.position.set(0.03, 1.49, -0.03); // Y = top of head + half hair height
-        hairTopMain.rotation.y = -0.05;
+        hairTopMain.position.set(0.02, 1.48, -0.02); // Higher, slightly to character's right
+        hairTopMain.rotation.y = -0.1; // More pronounced sweep angle
         hairTopMain.name = 'hair_top_main';
         this.characterGroup.add(hairTopMain);
         
-        // Front fringe part of the sweep (more to character's right)
-        const hairFringeGeom = createBoxGeometry(0.24, 0.18, 0.12);
+        // Front fringe - defining the sweep across forehead
+        const hairFringeGeom = createBoxGeometry(0.26, 0.20, 0.14); // Longer, thinner
         const hairFringe = new THREE.Mesh(hairFringeGeom, hairMaterial);
-        hairFringe.position.set(0.06, 1.46, 0.10); // In front, slightly lower, offset right
-        hairFringe.rotation.x = -0.15;
-        hairFringe.rotation.y = -0.2;
-        hairFringe.rotation.z = -0.1;
+        hairFringe.position.set(0.07, 1.45, 0.12); // Forward, bit lower, character's right
+        hairFringe.rotation.x = -0.20;
+        hairFringe.rotation.y = -0.25; 
+        hairFringe.rotation.z = -0.15; 
         hairFringe.name = 'hair_fringe';
         this.characterGroup.add(hairFringe);
 
-        // Left Hair Side (character's left)
-        const hairSideLeftGeom = createBoxGeometry(0.05, 0.20, 0.20);
+        // Connecting piece for top volume
+        const hairTopConnectGeom = createBoxGeometry(0.15, 0.1, 0.22);
+        const hairTopConnect = new THREE.Mesh(hairTopConnectGeom, hairMaterial);
+        hairTopConnect.position.set(-0.08, 1.46, -0.01); // Fills gap on character's left
+        hairTopConnect.rotation.y = 0.15;
+        hairTopConnect.name = 'hair_top_connect';
+        this.characterGroup.add(hairTopConnect);
+
+        // Left Hair Side (character's left) - shorter
+        const hairSideLeftGeom = createBoxGeometry(0.045, 0.18, 0.18);
         const hairSideLeft = new THREE.Mesh(hairSideLeftGeom, hairMaterial);
-        hairSideLeft.position.set(-0.165, 1.32, -0.04); // Against head side
+        hairSideLeft.position.set(-0.16, 1.30, -0.05); 
         hairSideLeft.name = 'hair_side_left';
         this.characterGroup.add(hairSideLeft);
 
-        // Right Hair Side (character's right)
-        const hairSideRightGeom = createBoxGeometry(0.05, 0.18, 0.18); // Slightly shorter for asymmetry
+        // Right Hair Side (character's right) - shorter
+        const hairSideRightGeom = createBoxGeometry(0.045, 0.17, 0.17);
         const hairSideRight = new THREE.Mesh(hairSideRightGeom, hairMaterial);
-        hairSideRight.position.set(0.165, 1.31, -0.04);
+        hairSideRight.position.set(0.16, 1.29, -0.05);
         hairSideRight.name = 'hair_side_right';
         this.characterGroup.add(hairSideRight);
 
-        // Hair Back
-        const hairBackGeom = createBoxGeometry(0.30, 0.20, 0.07); 
+        // Hair Back - neat and short
+        const hairBackGeom = createBoxGeometry(0.31, 0.18, 0.06); 
         const hairBack = new THREE.Mesh(hairBackGeom, hairMaterial);
-        hairBack.position.set(0, 1.33, -0.155); // Back of the head
+        hairBack.position.set(0, 1.31, -0.15); 
         hairBack.name = 'hair_back';
         this.characterGroup.add(hairBack);
         
         // Arms
-        const armGeometry = createBoxGeometry(0.12, 0.55, 0.12); 
-        const armMaterial = createStandardMaterial(CHARACTER_COLORS.HOODIE, 0.8, 0.1); 
+        const armGeometry = createBoxGeometry(0.11, 0.56, 0.11); // Slimmer arms
+        const armMaterial = createStandardMaterial(CHARACTER_COLORS.HOODIE, 0.85, 0.1); 
         
         const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-        leftArm.position.set(-0.31, 0.52, 0); 
-        leftArm.rotation.z = 0.1;
+        leftArm.position.set(-0.315, 0.50, 0); // Adjusted to torso
+        leftArm.rotation.z = 0.08;
         leftArm.name = 'leftArm';
         this.leftArm = leftArm;
         this.characterGroup.add(leftArm);
         
         const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-        rightArm.position.set(0.31, 0.52, 0);
-        rightArm.rotation.z = -0.1;
+        rightArm.position.set(0.315, 0.50, 0);
+        rightArm.rotation.z = -0.08;
         rightArm.name = 'rightArm';
         this.rightArm = rightArm;
         this.characterGroup.add(rightArm);
         
-        // Legs - skinny jeans style
-        const legGeometry = createBoxGeometry(0.15, 0.75, 0.15); 
-        const legMaterial = createStandardMaterial(CHARACTER_COLORS.PANTS, 0.85, 0.05); // Very slightly different from hoodie
+        // Legs - skinny style
+        const legGeometry = createBoxGeometry(0.14, 0.78, 0.14); // Slightly longer, slimmer
+        const legMaterial = createStandardMaterial(CHARACTER_COLORS.PANTS, 0.9, 0.05); 
         
         const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-        leftLeg.position.set(-0.1, -0.175, 0); 
+        leftLeg.position.set(-0.095, -0.19, 0); // Adjusted base Y
         leftLeg.name = 'leftLeg';
         this.leftLeg = leftLeg;
         this.characterGroup.add(leftLeg);
         
         const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-        rightLeg.position.set(0.1, -0.175, 0);
+        rightLeg.position.set(0.095, -0.19, 0);
         rightLeg.name = 'rightLeg';
         this.rightLeg = rightLeg;
         this.characterGroup.add(rightLeg);
         
-        // Shoes - simplified to match sprite (low-top classic sneaker)
-        const createClassicSneaker = () => {
+        // Shoes - Refined flat classic sneaker
+        const createFlatSneaker = () => {
             const sneakerGroup = new THREE.Group();
             
-            // Main shoe body (upper)
-            const upperGeometry = createBoxGeometry(0.22, 0.12, 0.38); 
-            const upperMaterial = createStandardMaterial(CHARACTER_COLORS.SHOES_UPPER, 0.9);
+            // Main shoe upper - flatter
+            const upperGeometry = createBoxGeometry(0.21, 0.10, 0.39); // Slimmer height, slightly longer
+            const upperMaterial = createStandardMaterial(CHARACTER_COLORS.SHOES_UPPER, 0.95);
             const upper = new THREE.Mesh(upperGeometry, upperMaterial);
-            upper.position.set(0, 0.0, 0.02); 
+            upper.position.y = 0.01; // Slightly higher for sole to fit under
             sneakerGroup.add(upper);
             
-            // Sole
-            const soleGeometry = createBoxGeometry(0.24, 0.08, 0.40); 
-            const soleMaterial = createStandardMaterial(CHARACTER_COLORS.SHOES_SOLE_LACES, 0.95); // White, not shiny
+            // Sole - thinner
+            const soleGeometry = createBoxGeometry(0.23, 0.06, 0.41); 
+            const soleMaterial = createStandardMaterial(CHARACTER_COLORS.SHOES_SOLE, 0.98); // Off-white sole
             const sole = new THREE.Mesh(soleGeometry, soleMaterial);
-            sole.position.set(0, -0.08, 0.02); 
+            sole.position.y = -0.05; // Position sole under upper
             sneakerGroup.add(sole);
             
-            // Laces (simplified)
-            const laceDetailGeometry = createBoxGeometry(0.18, 0.03, 0.05); 
-            const laceMaterial = createStandardMaterial(CHARACTER_COLORS.SHOES_SOLE_LACES, 0.95);
-            const laceDetail = new THREE.Mesh(laceDetailGeometry, laceMaterial);
-            laceDetail.position.set(0, 0.055, 0.08); // On top front of upper
-            laceDetail.rotation.x = -0.3; // Angle back slightly
-            sneakerGroup.add(laceDetail);
+            // Simple Lace Detail / Tongue area
+            const laceAreaGeometry = createBoxGeometry(0.16, 0.05, 0.04); // Flat plate for laces
+            const laceMaterial = createStandardMaterial(CHARACTER_COLORS.SHOES_LACES_TOECAP, 1.0);
+            const laceArea = new THREE.Mesh(laceAreaGeometry, laceMaterial);
+            laceArea.position.set(0, 0.06, 0.09); // On top-front of upper
+            laceArea.rotation.x = -0.35; 
+            sneakerGroup.add(laceArea);
+
+            // Subtle Toe Cap (optional, for Vans-like look)
+            const toeCapGeom = createBoxGeometry(0.18, 0.07, 0.05);
+            const toeCap = new THREE.Mesh(toeCapGeom,createStandardMaterial(CHARACTER_COLORS.SHOES_UPPER, 0.95)); // Can be shoe color or white
+             // If white: createStandardMaterial(CHARACTER_COLORS.SHOES_LACES_TOECAP, 1.0)
+            toeCap.position.set(0, -0.01, 0.17); // At the very front toe
+            sneakerGroup.add(toeCap);
             
+            sneakerGroup.position.z = 0.02; // Move entire shoe slightly forward from leg center
             return sneakerGroup;
         };
 
-        this.leftShoe = createClassicSneaker();
-        // Position: leg bottom Y (-0.175 - 0.75/2 = -0.55) minus half of shoe effective height
-        // Shoe "effective" center Y relative to its group origin: -0.08 (sole pos) + 0 (sole y center) = -0.08 from shoe group origin.
-        // Total shoe height approx 0.12 (upper) + 0.08 (sole) = 0.2. Lowest point -0.12.
-        // Position Y: -0.55 (leg bottom) - 0.12 (shoe height above ground) = -0.67 (approx for shoe group origin)
-        this.leftShoe.position.set(-0.1, -0.63, 0.05); // (leg Y - leg_h/2) - (shoe_group_y_offset + shoe_sole_h/2)
+        this.leftShoe = createFlatSneaker();
+        // Position calculation: Leg bottom Y (-0.19 - 0.78/2 = -0.58)
+        // Shoe origin is roughly at center of sole Y. Sole Y is -0.05, sole height is 0.06.
+        // So lowest point of sole is -0.05 - 0.03 = -0.08 relative to shoe group.
+        // Shoe group Y: -0.58 (leg bottom) - 0.08 (shoe height) = -0.66.
+        this.leftShoe.position.set(-0.095, -0.66, 0); 
         this.leftShoe.name = 'leftShoe';
         this.characterGroup.add(this.leftShoe);
 
-        this.rightShoe = createClassicSneaker();
-        this.rightShoe.position.set(0.1, -0.63, 0.05);
+        this.rightShoe = createFlatSneaker();
+        this.rightShoe.position.set(0.095, -0.66, 0);
         this.rightShoe.name = 'rightShoe';
         this.characterGroup.add(this.rightShoe);
         
-        // Character group base position for feet at Y=0
-        // Lowest point of shoe is at its local Y position (-0.08 for sole) - sole height/2 (0.04) = -0.12
-        // So, if shoe group is at -0.63, absolute lowest point is -0.63 - 0.12 = -0.75
-        this.characterGroup.position.set(0, 0.75, 0);
+        // Adjust character group base position so feet are at Y=0
+        // Lowest point of shoe in local space is ~ -0.08.
+        // Shoe group Y is -0.66. So absolute lowest Y of character model is -0.66 - 0.08 = -0.74
+        this.characterGroup.position.set(0, 0.74, 0);
     }
 
     setupState() {
@@ -271,21 +290,22 @@ export class Character {
             rotation: 0,
             moveSpeed: 5,
             jumpForce: 8,
-            gravity: -15,
+            gravity: -15, // Keep gravity fairly high for snappy jumps
             velocity: new THREE.Vector3(),
             isJumping: false,
             jumpVelocity: 0,
             baseY: this.characterGroup.position.y, 
             walkTime: 0,
-            walkSpeed: 10,
-            walkAmplitude: 0.2, 
+            walkSpeed: 10, // Controls how fast the walk cycle plays
+            walkAmplitude: 0.18, // Reduced amplitude for more subtle walk
             isWalking: false,
             isIdle: true,
             idleAnimationTime: Math.random() * Math.PI * 2, 
-            idleAnimationSpeed: 0.5 + Math.random() * 0.5,
+            idleAnimationSpeed: 0.45 + Math.random() * 0.3, // Slightly slower idle
             shouldWaveArm: false,
         };
 
+        // Store references to parts for animation
         this.leftLeg = this.characterGroup.getObjectByName('leftLeg');
         this.rightLeg = this.characterGroup.getObjectByName('rightLeg');
         this.leftArm = this.characterGroup.getObjectByName('leftArm');
@@ -303,6 +323,7 @@ export class Character {
     }
     
     update(deltaTime, keys, camera, obstacles = [], portals = []) {
+        // --- Player Input & Velocity Update ---
         const moveDirection = new THREE.Vector3(0, 0, 0);
         let isPlayerMoving = false;
         let playerWantsToShoot = false;
@@ -317,21 +338,21 @@ export class Character {
              playerWantsToShoot = true;
         }
 
-        if (Object.keys(keys).length > 0) { // Assume player if keys are passed
+        if (Object.keys(keys).length > 0) { // Player-controlled
             if (isPlayerMoving) {
                 moveDirection.normalize();
-                const moveVelocity = moveDirection.multiplyScalar(this.characterState.moveSpeed);
-                this.characterState.velocity.x = THREE.MathUtils.lerp(this.characterState.velocity.x, moveVelocity.x, 0.1);
-                this.characterState.velocity.z = THREE.MathUtils.lerp(this.characterState.velocity.z, moveVelocity.z, 0.1);
-                this.characterState.rotation = Math.atan2(moveDirection.x, moveDirection.z);
-                this.characterGroup.rotation.y = this.characterState.rotation;
+                const targetVelocity = moveDirection.multiplyScalar(this.characterState.moveSpeed);
+                // Interpolate for smoother movement start/stop
+                this.characterState.velocity.x = THREE.MathUtils.lerp(this.characterState.velocity.x, targetVelocity.x, 0.15);
+                this.characterState.velocity.z = THREE.MathUtils.lerp(this.characterState.velocity.z, targetVelocity.z, 0.15);
+                this.characterGroup.rotation.y = Math.atan2(this.characterState.velocity.x, this.characterState.velocity.z);
             } else {
-                 this.characterState.velocity.x = THREE.MathUtils.lerp(this.characterState.velocity.x, 0, 0.1);
-                 this.characterState.velocity.z = THREE.MathUtils.lerp(this.characterState.velocity.z, 0, 0.1);
+                 this.characterState.velocity.x = THREE.MathUtils.lerp(this.characterState.velocity.x, 0, 0.15);
+                 this.characterState.velocity.z = THREE.MathUtils.lerp(this.characterState.velocity.z, 0, 0.15);
             }
             
-            this.characterState.isWalking = isPlayerMoving && !this.characterState.isJumping;
-            this.characterState.isIdle = !isPlayerMoving && !this.characterState.isJumping;
+            this.characterState.isWalking = (Math.abs(this.characterState.velocity.x) > 0.01 || Math.abs(this.characterState.velocity.z) > 0.01) && !this.characterState.isJumping;
+            this.characterState.isIdle = !this.characterState.isWalking && !this.characterState.isJumping;
 
             if (playerWantsToShoot) {
                 this.lastShootTime = now;
@@ -341,141 +362,154 @@ export class Character {
                 }
             }
         } 
-        
+        // For NPCs, velocity.x/z and animation states are set externally by NPC class
+
+        // --- Vertical Movement (Gravity & Jumping) ---
         if (this.characterState.isJumping) {
             this.characterState.jumpVelocity += this.characterState.gravity * deltaTime;
             this.characterState.velocity.y = this.characterState.jumpVelocity;
         } else {
-            // Apply a small downward force for ground detection, or integrate gravity better
-             if (this.characterGroup.position.y > this.characterState.baseY) { // If above base, apply gravity
-                 this.characterState.velocity.y += this.characterState.gravity * deltaTime * 0.1; // Softer gravity when just falling to ground
-             } else {
-                this.characterState.velocity.y = -1; // Ensure contact or small push for collision
-             }
+            // Apply gravity if slightly above base ground, or ensure contact
+            if (this.characterGroup.position.y > this.characterState.baseY + 0.01) {
+                this.characterState.velocity.y += this.characterState.gravity * deltaTime * 0.5; // Softer continuous gravity
+            } else if (this.characterGroup.position.y < this.characterState.baseY - 0.01) {
+                 // If sunk below baseY for some reason, try to correct upwards quickly unless jumping
+                 this.characterState.velocity.y = Math.max(this.characterState.velocity.y, 1); 
+            }
+            else {
+                this.characterState.velocity.y = -0.1; // Gentle downward push for collision
+            }
         }
-
+        
+        // --- Collision Detection & Resolution ---
         const currentPosition = this.characterGroup.position.clone();
         let proposedPosition = currentPosition.clone().add(this.characterState.velocity.clone().multiplyScalar(deltaTime)); 
         
-        let collisionOccurred = false;
-        let verticalCollision = false;
-        
-        // Sprite total height is ~130px. If head is ~25px, body ~45px, legs ~60px.
-        // Our 3D model has roughly: head 0.38, body 1.1, leg 0.75, shoe 0.12 => ~2.35 units.
-        // Sprite appears to be about 1 head wide. Our head is 0.32 wide.
-        const collisionCharacterHeight = 1.95; // From feet on ground to top of head (approx)
-        const collisionCharacterWidth = 0.4;  // Adjusted for slimmer profile
+        // Approximate character collision dimensions (adjust as needed)
+        // Height from feet to top of hair approx: 0.74 (base) + 1.48 (hair top Y) + 0.12 (half hair height) = ~1.62 (total model height is around 1.48 (hair) + 0.08 (shoe sole) = 1.56 from feet to top)
+        // For collision, a slightly more generous box is often better.
+        const collisionCharacterHeight = 1.6; 
+        const collisionCharacterWidth = 0.4;  
 
         obstacles.forEach(obstacle => {
-            // Character's AABB for collision checking is centered at character's feet XZ, and Y extends upwards
-            const checkMinY = proposedPosition.y; // Bottom of collision box is at feet
-            const checkMaxY = proposedPosition.y + collisionCharacterHeight; // Top of collision box
+            const checkMinY = proposedPosition.y; 
+            const checkMaxY = proposedPosition.y + collisionCharacterHeight;
 
-            const collisionMin = new THREE.Vector3(
+            const charAABBmin = new THREE.Vector3(
                 proposedPosition.x - collisionCharacterWidth / 2, 
                 checkMinY, 
                 proposedPosition.z - collisionCharacterWidth / 2
             );
-            const collisionMax = new THREE.Vector3(
+            const charAABBmax = new THREE.Vector3(
                 proposedPosition.x + collisionCharacterWidth / 2, 
                 checkMaxY, 
                 proposedPosition.z + collisionCharacterWidth / 2
             );
-            const collisionCheckAABB = new THREE.Box3(collisionMin, collisionMax);
+            const charCollisionAABB = new THREE.Box3(charAABBmin, charAABBmax);
 
-             if (collisionCheckAABB.intersectsBox(obstacle.aabb)) {
-                 collisionOccurred = true;
-                 const yCenterForCheck = currentPosition.clone(); // Use current for Y projection test
-                 yCenterForCheck.y = proposedPosition.y + (collisionCharacterHeight / 2);
-                 const tempAABB_Y = new THREE.Box3().setFromCenterAndSize(yCenterForCheck, new THREE.Vector3(collisionCharacterWidth, collisionCharacterHeight, collisionCharacterWidth));
+            if (charCollisionAABB.intersectsBox(obstacle.aabb)) {
+                 // Y-collision first
+                 const tempYcenter = currentPosition.clone();
+                 tempYcenter.y = proposedPosition.y + (collisionCharacterHeight / 2);
+                 const tempAABB_Y = new THREE.Box3().setFromCenterAndSize(tempYcenter, new THREE.Vector3(collisionCharacterWidth, collisionCharacterHeight, collisionCharacterWidth));
                  
                  if (tempAABB_Y.intersectsBox(obstacle.aabb)) {
-                      verticalCollision = true;
-                      if (this.characterState.velocity.y <= 0) { 
+                      if (this.characterState.velocity.y <= 0) { // Moving Down / On Ground
                            this.characterState.isJumping = false;
                            this.characterState.jumpVelocity = 0;
                            this.characterState.velocity.y = 0;
                            proposedPosition.y = obstacle.aabb.max.y; 
-                           this.characterState.baseY = proposedPosition.y;
-                      } else { 
-                           this.characterState.jumpVelocity = 0;
+                           this.characterState.baseY = proposedPosition.y; // Update base Y to what we landed on
+                      } else { // Moving Up (Hit head)
+                           this.characterState.jumpVelocity = 0; // Stop upward jump velocity
                            this.characterState.velocity.y = 0;
-                           proposedPosition.y = obstacle.aabb.min.y - collisionCharacterHeight - 0.01;
+                           proposedPosition.y = obstacle.aabb.min.y - collisionCharacterHeight - 0.01; // Place below obstacle
                       }
                  }
 
-                 const characterSize = new THREE.Vector3(collisionCharacterWidth, collisionCharacterHeight, collisionCharacterWidth);
-                 
-                 const xCenterForCheck = currentPosition.clone();
-                 xCenterForCheck.x = proposedPosition.x;
-                 xCenterForCheck.y = proposedPosition.y + collisionCharacterHeight / 2; // Use already Y-resolved position
-                 const tempAABB_X = new THREE.Box3().setFromCenterAndSize(xCenterForCheck, characterSize);
+                 // X-collision
+                 const tempXcenter = currentPosition.clone(); // Use current Z
+                 tempXcenter.x = proposedPosition.x;          // Test proposed X
+                 tempXcenter.y = proposedPosition.y + collisionCharacterHeight / 2; // Use Y-resolved position
+                 const tempAABB_X = new THREE.Box3().setFromCenterAndSize(tempXcenter, new THREE.Vector3(collisionCharacterWidth, collisionCharacterHeight, collisionCharacterWidth));
                  if (tempAABB_X.intersectsBox(obstacle.aabb)) {
                      this.characterState.velocity.x = 0;
-                     if (proposedPosition.x > currentPosition.x) {
-                          proposedPosition.x = obstacle.aabb.min.x - (characterSize.x / 2) - 0.01;
-                     } else {
-                          proposedPosition.x = obstacle.aabb.max.x + (characterSize.x / 2) + 0.01;
+                     if (proposedPosition.x > currentPosition.x) { // Moving Right
+                          proposedPosition.x = obstacle.aabb.min.x - (collisionCharacterWidth / 2) - 0.01;
+                     } else { // Moving Left
+                          proposedPosition.x = obstacle.aabb.max.x + (collisionCharacterWidth / 2) + 0.01;
                      }
                  }
 
-                 const zCenterForCheck = currentPosition.clone();
-                 zCenterForCheck.z = proposedPosition.z;
-                 zCenterForCheck.y = proposedPosition.y + collisionCharacterHeight / 2; // Use already Y-resolved position
-                 const tempAABB_Z = new THREE.Box3().setFromCenterAndSize(zCenterForCheck, characterSize);
+                 // Z-collision
+                 const tempZcenter = currentPosition.clone(); // Use current X
+                 tempZcenter.z = proposedPosition.z;          // Test proposed Z
+                 tempZcenter.y = proposedPosition.y + collisionCharacterHeight / 2; // Use Y-resolved position
+                 const tempAABB_Z = new THREE.Box3().setFromCenterAndSize(tempZcenter, new THREE.Vector3(collisionCharacterWidth, collisionCharacterHeight, collisionCharacterWidth));
                  if (tempAABB_Z.intersectsBox(obstacle.aabb)) {
                      this.characterState.velocity.z = 0;
-                     if (proposedPosition.z > currentPosition.z) { 
-                          proposedPosition.z = obstacle.aabb.min.z - (characterSize.z / 2) - 0.01;
-                     } else { 
-                          proposedPosition.z = obstacle.aabb.max.z + (characterSize.z / 2) + 0.01;
+                     if (proposedPosition.z > currentPosition.z) { // Moving Forward (+Z in character space)
+                          proposedPosition.z = obstacle.aabb.min.z - (collisionCharacterWidth / 2) - 0.01;
+                     } else { // Moving Backward (-Z in character space)
+                          proposedPosition.z = obstacle.aabb.max.z + (collisionCharacterWidth / 2) + 0.01;
                      }
                  }
-             }
+            }
         });
 
         this.characterGroup.position.copy(proposedPosition);
 
-        if (this.characterGroup.position.y < this.characterState.baseY && !this.characterState.isJumping && !verticalCollision) {
+        // Final ground clamp if not jumping and no vertical collision happened that frame
+        if (!this.characterState.isJumping && Math.abs(this.characterState.velocity.y) < 0.1 && this.characterGroup.position.y < this.characterState.baseY) {
+             if(this.characterGroup.position.y < this.characterState.baseY - 0.05) { // Only hard clamp if significantly below
+                this.characterGroup.position.y = this.characterState.baseY;
+             }
+        } else if (this.characterState.isJumping && this.characterGroup.position.y <= this.characterState.baseY && this.characterState.velocity.y <0) {
+            // Landed during a jump
             this.characterGroup.position.y = this.characterState.baseY;
+            this.characterState.isJumping = false;
+            this.characterState.jumpVelocity = 0;
             this.characterState.velocity.y = 0;
-            if (this.characterState.isJumping) { // Landed
-                 this.characterState.isJumping = false;
-                 this.characterState.jumpVelocity = 0;
-            }
         }
         
         this.characterState.x = this.characterGroup.position.x;
         this.characterState.y = this.characterGroup.position.y;
         this.characterState.z = this.characterGroup.position.z;
         
+        // --- Animations & Other Updates ---
         if (this.characterState.isWalking) {
             this.characterState.walkTime += deltaTime * this.characterState.walkSpeed;
             this.animateWalk(this.characterState.walkTime, this.characterState.walkAmplitude);
         } else if (this.characterState.isIdle) {
             this.characterState.idleAnimationTime += deltaTime * this.characterState.idleAnimationSpeed;
             this.animateIdle(this.characterState.idleAnimationTime, this.characterState.shouldWaveArm); 
-        } else { // Jumping or falling
+        } else { 
             this.setNeutralPose();
         }
 
-         if (Object.keys(keys).length > 0) { // Only update vinyls for player
+        if (Object.keys(keys).length > 0) { // Player character updates
              for (let i = this.vinyls.length - 1; i >= 0; i--) {
                  const vinyl = this.vinyls[i];
-                 vinyl.update(deltaTime); // This should return false if vinyl is inactive or handle its own scene removal
-                 if (!vinyl.isActive) { // Vinyl handles its own disposal
-                     this.vinyls.splice(i, 1);
+                 if (!vinyl.update(deltaTime)) { // Vinyl's update returns false if inactive
+                     this.vinyls.splice(i, 1); // Vinyl handles its own disposal from scene
                  }
              }
-         }
+        }
         
         if (this.activeSpeechBubble && camera) {
             const headWorldPosition = new THREE.Vector3();
             const headMesh = this.characterGroup.getObjectByName('head');
             if (headMesh) {
                 headMesh.getWorldPosition(headWorldPosition);
-                headWorldPosition.y += 0.35; // Offset above the center of the head mesh
+                // Place bubble slightly above and in front of the head center
+                headWorldPosition.y += 0.45; 
+                // Small forward offset can be done in SpeechBubble itself or here via camera relative calc
                 this.activeSpeechBubble.update(headWorldPosition, camera);
+            } else {
+                // Fallback if head mesh not found (shouldn't happen)
+                const charPos = this.characterGroup.position.clone();
+                charPos.y += 1.8;
+                this.activeSpeechBubble.update(charPos, camera);
             }
         }
     }
@@ -483,120 +517,143 @@ export class Character {
 
     animateWalk(walkTime, amplitude) {
         const armAngle = Math.sin(walkTime) * amplitude;
-        const legAngle = Math.sin(walkTime) * amplitude * 1.1; // Slightly more leg swing
+        const legAngle = Math.sin(walkTime) * amplitude * 1.2; // Leg swing slightly more
 
         if (this.leftArm) {
             this.leftArm.rotation.x = -armAngle;
-            this.leftArm.rotation.z = 0.05 + Math.sin(walkTime * 0.5) * 0.03; 
+            this.leftArm.rotation.z = 0.03 + Math.sin(walkTime * 0.6) * 0.02; 
         }
         if (this.rightArm) {
             this.rightArm.rotation.x = armAngle;
-            this.rightArm.rotation.z = -0.05 - Math.sin(walkTime * 0.5) * 0.03;
+            this.rightArm.rotation.z = -0.03 - Math.sin(walkTime * 0.6) * 0.02;
         }
 
-        const legBaseY = -0.175; 
-        const shoeBaseY = -0.63; 
-        const legBobAmplitude = 0.02; // More subtle bob
+        // Base Y positions for legs and shoes
+        const legBaseLocalY = -0.19; 
+        const shoeBaseLocalY = -0.66;
+        const legBobAmplitude = 0.015; // Very subtle bob
 
         if (this.leftLeg) {
             this.leftLeg.rotation.x = legAngle;
-            this.leftLeg.position.y = legBaseY + Math.abs(Math.sin(walkTime)) * legBobAmplitude;
+            this.leftLeg.position.y = legBaseLocalY + Math.abs(Math.sin(walkTime)) * legBobAmplitude;
         }
         if (this.rightLeg) {
             this.rightLeg.rotation.x = -legAngle;
-            this.rightLeg.position.y = legBaseY + Math.abs(Math.sin(walkTime + Math.PI)) * legBobAmplitude;
+            this.rightLeg.position.y = legBaseLocalY + Math.abs(Math.sin(walkTime + Math.PI)) * legBobAmplitude;
         }
 
         if (this.leftShoe && this.leftLeg) {
-            this.leftShoe.rotation.x = this.leftLeg.rotation.x * 0.8; // Shoes rotate slightly less than legs
-            this.leftShoe.position.y = shoeBaseY + (this.leftLeg.position.y - legBaseY); 
+            this.leftShoe.rotation.x = this.leftLeg.rotation.x * 0.7; 
+            this.leftShoe.position.y = shoeBaseLocalY + (this.leftLeg.position.y - legBaseLocalY); 
         }
         if (this.rightShoe && this.rightLeg) {
-            this.rightShoe.rotation.x = this.rightLeg.rotation.x * 0.8;
-            this.rightShoe.position.y = shoeBaseY + (this.rightLeg.position.y - legBaseY);
+            this.rightShoe.rotation.x = this.rightLeg.rotation.x * 0.7;
+            this.rightShoe.position.y = shoeBaseLocalY + (this.rightLeg.position.y - legBaseLocalY);
         }
     }
 
     animateIdle(idleTime, shouldWave) {
-         if (this.leftArm && this.rightArm) {
-             if (shouldWave) {
-                 const waveAngle = Math.sin(idleTime * 2) * 0.8; 
-                 this.rightArm.rotation.z = -0.1 - waveAngle;
-                 this.rightArm.rotation.x = -0.5 + Math.sin(idleTime) * 0.3;
-                 this.leftArm.rotation.x = Math.sin(idleTime * 0.5) * 0.03;
-                 this.leftArm.rotation.z = 0.1;
-             } else { // Subtle breathing
-                 const idleArmAngle = Math.sin(idleTime * 0.4) * 0.02; 
-                 this.leftArm.rotation.x = idleArmAngle;
-                 this.rightArm.rotation.x = -idleArmAngle;
-                 this.leftArm.rotation.z = 0.05 + Math.sin(idleTime * 0.25) * 0.01; 
-                 this.rightArm.rotation.z = -0.05 - Math.sin(idleTime * 0.25) * 0.01;
-             }
-         }
-        const legBaseY = -0.175;
-        const shoeBaseY = -0.63;
+        const legBaseLocalY = -0.19;
+        const shoeBaseLocalY = -0.66;
 
-         if (this.leftLeg) { // Subtle leg sway
-            this.leftLeg.rotation.x = Math.sin(idleTime * 0.15) * 0.015;
-            this.leftLeg.position.y = legBaseY;
+        if (this.leftArm && this.rightArm) {
+            if (shouldWave) {
+                const waveAngle = Math.sin(idleTime * 2.2) * 0.9; 
+                this.rightArm.rotation.z = -0.08 - waveAngle; // Raise arm from side for wave
+                this.rightArm.rotation.x = -0.6 + Math.sin(idleTime * 1.2) * 0.35; // Forward/back wave motion
+                this.leftArm.rotation.x = Math.sin(idleTime * 0.4) * 0.02; // Gentle sway for other arm
+                this.leftArm.rotation.z = 0.08;
+            } else { // Subtle breathing / idle pose
+                const idleArmAngle = Math.sin(idleTime * 0.35) * 0.015; 
+                this.leftArm.rotation.x = idleArmAngle;
+                this.rightArm.rotation.x = -idleArmAngle;
+                this.leftArm.rotation.z = 0.06 + Math.sin(idleTime * 0.2) * 0.01; 
+                this.rightArm.rotation.z = -0.06 - Math.sin(idleTime * 0.2) * 0.01;
+            }
+        }
+        
+        // Subtle idle leg movement
+        if (this.leftLeg) {
+            this.leftLeg.rotation.x = Math.sin(idleTime * 0.1) * 0.01;
+            this.leftLeg.position.y = legBaseLocalY;
         }
         if (this.rightLeg) {
-            this.rightLeg.rotation.x = -Math.sin(idleTime * 0.15) * 0.015;
-            this.rightLeg.position.y = legBaseY;
+            this.rightLeg.rotation.x = -Math.sin(idleTime * 0.1) * 0.01;
+            this.rightLeg.position.y = legBaseLocalY;
         }
         if (this.leftShoe && this.leftLeg) {
             this.leftShoe.rotation.x = this.leftLeg.rotation.x;
-            this.leftShoe.position.y = shoeBaseY;
+            this.leftShoe.position.y = shoeBaseLocalY;
         }
         if (this.rightShoe && this.rightLeg) {
             this.rightShoe.rotation.x = this.rightLeg.rotation.x;
-            this.rightShoe.position.y = shoeBaseY;
+            this.rightShoe.position.y = shoeBaseLocalY;
         }
     }
 
     setNeutralPose() {
-        const legBaseY = -0.175;
-        const shoeBaseY = -0.63;
+        const legBaseLocalY = -0.19;
+        const shoeBaseLocalY = -0.66;
 
-        if (this.leftArm) this.leftArm.rotation.set(0, 0, 0.05); // Closer to body
-        if (this.rightArm) this.rightArm.rotation.set(0, 0, -0.05);
+        if (this.leftArm) this.leftArm.rotation.set(0, 0, 0.08); // Arms slightly by the side
+        if (this.rightArm) this.rightArm.rotation.set(0, 0, -0.08);
         if (this.leftLeg) {
              this.leftLeg.rotation.set(0, 0, 0);
-             this.leftLeg.position.y = legBaseY;
+             this.leftLeg.position.y = legBaseLocalY;
         }
         if (this.rightLeg) {
             this.rightLeg.rotation.set(0, 0, 0);
-            this.rightLeg.position.y = legBaseY;
+            this.rightLeg.position.y = legBaseLocalY;
         }
         if (this.leftShoe) {
             this.leftShoe.rotation.set(0, 0, 0);
-            this.leftShoe.position.y = shoeBaseY;
+            this.leftShoe.position.y = shoeBaseLocalY;
         }
          if (this.rightShoe) {
             this.rightShoe.rotation.set(0, 0, 0);
-            this.rightShoe.position.y = shoeBaseY;
+            this.rightShoe.position.y = shoeBaseLocalY;
         }
     }
 
     shootVinyl() {
         const direction = new THREE.Vector3();
-        this.characterGroup.getWorldDirection(direction);
-        direction.negate(); // Character model faces -Z, so negate for forward
-        
-        // Spawn vinyl from near hand/chest height
+        // Get forward direction based on character's rotation (Y-axis)
+        // Assuming character model's "front" is along its local +Z axis after rotation
+        // If model is oriented differently (e.g. faces -Z), this needs adjustment.
+        // Let's assume +Z is forward for simplicity here, adjust if sprite implies facing -Z for model.
+        this.characterGroup.getWorldDirection(direction); 
+        // If default model faces -Z, then direction.negate(); 
+        // Sprite reference seems to imply front facing camera initially (positive Z if camera is at -Z).
+        // After model update, sprite seems to face towards camera. Our character rotates on Y.
+        // `getWorldDirection` gets the local -Z axis in world space if not modified.
+        // Since our character's rotation points its +Z towards movement, this might be correct.
+        // But Habbo-style often has characters "facing" slightly away from direct movement for isometric.
+        // For a throw "forwards" relative to where character *looks*, use rotation.
+        // For now, use world direction from group.
+
+        const worldDir = new THREE.Vector3();
+        this.characterGroup.getWorldDirection(worldDir); // Gets the -Z direction the character group is facing.
+                                                        // We want the +Z direction for "forward throw".
+        worldDir.negate(); // Now it's the "forward" direction relative to character's orientation.
+
+
+        // Spawn vinyl from near character's hand/chest height
         const armWorldPos = new THREE.Vector3();
-        this.rightArm.getWorldPosition(armWorldPos); // Get right arm's world position
+        // Using head position as a more stable reference than rapidly moving arms
+        const headMesh = this.characterGroup.getObjectByName('head');
+        if (headMesh) {
+            headMesh.getWorldPosition(armWorldPos);
+            armWorldPos.y -= 0.3; // Estimate hand/chest level relative to head
+        } else { // Fallback to character group position
+            this.characterGroup.getWorldPosition(armWorldPos);
+            armWorldPos.y += 0.8; // Mid-body height
+        }
 
-        const spawnOffset = direction.clone().multiplyScalar(0.3); // Slightly in front
+
+        const spawnOffset = worldDir.clone().multiplyScalar(0.4); // Spawn slightly in front
         const spawnPosition = armWorldPos.clone().add(spawnOffset);
-        // spawnPosition.y adjustment might be needed if armWorldPos is too low/high.
-        // The Character group origin is at feet. Right arm's local Y is 0.52.
-        // So world Y of arm is charGroup.y + 0.52.
-        // For a throw, we might want it a bit higher, say chest/shoulder.
-        spawnPosition.y = this.characterGroup.position.y + 0.8;
 
-
-        const vinyl = new Vinyl(this.scene, spawnPosition, direction);
+        const vinyl = new Vinyl(this.scene, spawnPosition, worldDir);
         this.vinyls.push(vinyl);
     }
 
