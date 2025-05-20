@@ -1,14 +1,20 @@
+// js/npc.js
 import { Character } from './character.js';
 import * as THREE from 'three';
 
+const NPC_DEFAULT_HAIR_COLOR = 0x5D3A1F; // Same as player's default sprite hair
+
 export class NPC extends Character {
-    constructor(scene, position, chatSystem, name) {
-        console.log(`Creating NPC ${name} at position:`, position);
+    constructor(scene, position, chatSystem, name, obstacles = []) {
+        // console.log(`Creating NPC ${name} at position:`, position);
         super(scene, chatSystem, name);
         
-        this.chatSystem = chatSystem;
+        this.chatSystem = chatSystem; // Already stored by super, but good for clarity
+        this.npcObstacles = obstacles; // Store obstacles relevant to this NPC
         
         this.characterGroup.position.copy(position);
+        // Ensure NPC's base Y is its starting position's Y
+        this.characterState.baseY = position.y; 
         
         // Define cyberpunk color combinations for clothes
         const cyberpunkColors = [
@@ -20,23 +26,26 @@ export class NPC extends Character {
             { hoodie: 0xff6600, pants: 0x00ffff },
             // Electric Yellow & Magenta
             { hoodie: 0xffff00, pants: 0xff00ff },
-            // Neon Blue & Hot Pink
-            { hoodie: 0x00ffff, pants: 0xff00ff },
-            // Purple & Lime
-            { hoodie: 0x800080, pants: 0x00ff00 },
-            // Red & Cyan
-            { hoodie: 0xff0000, pants: 0x00ffff },
-            // Yellow & Purple
-            { hoodie: 0xffff00, pants: 0x800080 }
+            // Dark Grey & Neon Blue
+            { hoodie: 0x222222, pants: 0x0077ff },
+            // Black & Neon Red
+            { hoodie: 0x050505, pants: 0xff0000 },
+            // Muted Purple & Off-Black
+            { hoodie: 0x4b0082, pants: 0x1a1a1a },
+            // Grey & Yellow
+            { hoodie: 0x505050, pants: 0xffff33 }
         ];
         
-        // Define specific hair colors
+        // Define specific hair colors, including default
         const hairColors = [
-            0xFFD700, // Blonde
+            NPC_DEFAULT_HAIR_COLOR,
             0x000000, // Black
             0x0000FF, // Blue
             0xFF00FF, // Pink
-            0x800080  // Purple
+            0x800080, // Purple
+            0x00FF00, // Green
+            0xFFD700, // Blonde
+            0xDCDCDC, // Silver/Grey
         ];
         
         // Randomly select a color combination and hair color
@@ -71,140 +80,127 @@ export class NPC extends Character {
         ];
         
         this.setupIdleBehavior();
-        console.log(`NPC ${name} created successfully.`);
+        // console.log(`NPC ${name} created successfully.`);
     }
 
-    applyColors(colors, hairColor) {
-        // Update hoodie color
-        this.characterGroup.children.forEach(child => {
-            if (child.name === 'hoodie' || child.name === 'hood' || 
-                child.name === 'leftArm' || child.name === 'rightArm') {
-                child.material.color.setHex(colors.hoodie);
-            }
-            // Update pants color (legs)
-            if (child.name === 'leftLeg' || child.name === 'rightLeg') {
-                child.material.color.setHex(colors.pants);
-            }
-            // Update hair color
-            if (child.name === 'hair' || child instanceof THREE.Mesh && 
-                child.material.color.getHex() === 0x3a1f13) {
-                child.material.color.setHex(hairColor);
+    applyColors(colors, hairColorHex) {
+        const hairColor = new THREE.Color(hairColorHex);
+        this.characterGroup.traverse((child) => {
+            if (child.isMesh) {
+                // Hoodie parts (torso, hood, arms)
+                if (child.name === 'hoodie_torso' || child.name === 'hood' || child.name === 'hood_top_edge' ||
+                    child.name === 'leftArm' || child.name === 'rightArm') {
+                    if (child.material) {
+                        child.material.color.setHex(colors.hoodie);
+                    }
+                }
+                // Pants (legs)
+                else if (child.name === 'leftLeg' || child.name === 'rightLeg') {
+                     if (child.material) {
+                        child.material.color.setHex(colors.pants);
+                    }
+                }
+                // Hair parts
+                else if (child.name.startsWith('hair_') || child.name.endsWith('Eyebrow')) {
+                     if (child.material) {
+                        child.material.color.copy(hairColor);
+                    }
+                }
             }
         });
     }
 
     setupIdleBehavior() {
         this.idleState = {
-            targetPosition: new THREE.Vector3(),
-            moveSpeed: 2,
+            targetPosition: this.characterGroup.position.clone(), // Start with current position
+            moveSpeed: 1 + Math.random() * 1.5, // Slower, more varied speed: 1 to 2.5
             idleTimer: 0,
-            idleDuration: 3 + Math.random() * 4, // Random duration between 3-7 seconds
+            idleDuration: 3 + Math.random() * 4,
             isMoving: false,
             waitTime: 0,
-            maxWaitTime: 2 + Math.random() * 3, // Random wait time between 2-5 seconds
-            // Add idle animation states
-            idleAnimationTime: Math.random() * Math.PI * 2, // Random start phase
-            idleAnimationSpeed: 0.5 + Math.random() * 0.5, // Random animation speed
-            shouldWaveArm: Math.random() < 0.3 // 30% chance to wave while idle
+            maxWaitTime: 3 + Math.random() * 5, // Random wait time between 3-8 seconds
+            idleAnimationTime: Math.random() * Math.PI * 2, 
+            idleAnimationSpeed: 0.4 + Math.random() * 0.4, 
+            shouldWaveArm: Math.random() < 0.1 // 10% chance to wave
         };
-        this.updateTargetPosition();
+        // Initial target can be current pos, or set one immediately
+        // this.updateTargetPosition(); // Optionally start moving right away
     }
 
     updateTargetPosition() {
-        // Random position within pier boundaries
+        // Random position within pier boundaries, maintaining current Y level
         this.idleState.targetPosition.set(
-            (Math.random() - 0.5) * 38, // -19 to 19
-            0.9, // Keep on pier surface
-            (Math.random() - 0.5) * 18  // -9 to 9
+            (Math.random() - 0.5) * 38, 
+            this.characterGroup.position.y, // Keep current Y
+            (Math.random() - 0.5) * 18  
         );
         this.idleState.isMoving = true;
         this.idleState.waitTime = 0;
-        // Reset idle animation state
-        this.idleState.shouldWaveArm = Math.random() < 0.3;
+        this.idleState.shouldWaveArm = Math.random() < 0.1; 
     }
 
-    update(deltaTime, camera) {
+    update(deltaTime, camera, obstacles = []) { // Receive obstacles from main loop
         if (!this.characterGroup) {
             console.error(`NPC ${this.name} characterGroup is undefined`);
             return;
         }
-        if (!this.chatSystem) {
-             console.error(`NPC ${this.name} chatSystem is undefined`);
-             // Don't proceed with chat logic if system is missing
-        } else {
-             // Update speech timing
+        if (this.chatSystem) {
              this.speechTimer += deltaTime;
              if (this.speechTimer >= this.speechInterval) {
                  this.speechTimer = 0;
-                 this.speechInterval = 10 + Math.random() * 15; // New random interval
+                 this.speechInterval = 10 + Math.random() * 15;
 
-                 // Select a new random message different from the last one
                  let newMessage;
                  do {
                      newMessage = this.messages[Math.floor(Math.random() * this.messages.length)];
                  } while (newMessage === this.lastMessage && this.messages.length > 1);
 
                  this.lastMessage = newMessage;
-                 // MODIFIED: Use the character's say method for speech bubble
                  this.say(newMessage); 
-                 // ALSO add to chat log
                  this.chatSystem.addNPCMessage(this.name, newMessage);
              }
         }
 
-        // Update speech bubble if active (Let Character class handle this)
-        // if (this.activeSpeechBubble) { 
-        //     this.activeSpeechBubble.update(this.characterGroup.position, camera);
-        // }
-        // We call the parent update method AFTER our NPC-specific logic
-        // This ensures the base Character update (movement, animations, speech bubble update) runs.
-        super.update(deltaTime, {}, camera, [], []); // Pass empty keys, obstacles, portals for base update
-
-        // --- NPC Idle Movement Logic (moved from Character.update) ---
-        // Update idle behavior timer (previously part of Character update, now specific to NPC)
-        // this.idleState.idleTimer += deltaTime; // Timer update handled by base Character class now if needed
-
+        // --- NPC Idle Movement Logic ---
         if (this.idleState.isMoving) {
-            // Calculate direction to target
-            const direction = this.idleState.targetPosition.clone()
-                .sub(this.characterGroup.position);
+            const direction = this.idleState.targetPosition.clone().sub(this.characterGroup.position);
             const distance = direction.length();
 
-            if (distance > 0.1) {
-                // Normalize and apply movement
+            if (distance > 0.2) { // Increased threshold to prevent jitter
                 direction.normalize();
-                this.characterGroup.position.x += direction.x * this.idleState.moveSpeed * deltaTime;
-                this.characterGroup.position.z += direction.z * this.idleState.moveSpeed * deltaTime;
-
-                // Update rotation to face movement direction
+                // Set velocity for parent Character class to handle movement and collision
+                this.characterState.velocity.x = direction.x * this.idleState.moveSpeed;
+                this.characterState.velocity.z = direction.z * this.idleState.moveSpeed;
+                // Rotation handled by base Character class based on velocity/direction
                 this.characterGroup.rotation.y = Math.atan2(direction.x, direction.z);
 
-                // Update walk animation state (handled by base Character class)
                 this.characterState.isWalking = true; 
-
-            } else {
-                // Reached target position, start waiting
+                this.characterState.isIdle = false;
+            } else { // Reached target
                 this.idleState.isMoving = false;
                 this.idleState.waitTime = 0;
-                this.characterState.isWalking = false; // Stop walking animation state
-                // Update target position after waiting
-                // We'll handle this in the waiting section below
+                this.characterState.isWalking = false;
+                this.characterState.isIdle = true;
+                this.characterState.velocity.x = 0;
+                this.characterState.velocity.z = 0;
             }
-        } else {
-            // Update waiting time
+        } else { // Waiting
             this.idleState.waitTime += deltaTime;
-            this.characterState.isWalking = false; // Ensure not walking while waiting
-
-            // Perform idle animations (handled by base Character class)
+            this.characterState.isWalking = false;
             this.characterState.isIdle = true;
-            this.characterState.shouldWaveArm = this.idleState.shouldWaveArm; // Pass waving state
+            this.characterState.shouldWaveArm = this.idleState.shouldWaveArm;
+            this.characterState.velocity.x = 0;
+            this.characterState.velocity.z = 0;
 
-            // If wait time exceeded, find a new target
+
             if (this.idleState.waitTime >= this.idleState.maxWaitTime) {
                 this.updateTargetPosition();
-                this.characterState.isIdle = false; // Start moving again
+                // isIdle will be set to false by moving logic next frame if a target is set
             }
         }
-        // --- End NPC Idle Movement Logic ---
+        
+        // Call parent update method. Pass empty keys, but do pass obstacles.
+        // Portals are usually player-specific, NPCs typically don't use them automatically.
+        super.update(deltaTime, {}, camera, obstacles, []); 
     }
-} 
+}
